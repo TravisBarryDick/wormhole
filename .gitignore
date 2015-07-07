@@ -37,3 +37,8 @@ config.mk
 *.pb.*
 build
 guide
+
+# Data
+./learn/data/
+.*
+!.gitignore

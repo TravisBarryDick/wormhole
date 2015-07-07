@@ -1,18 +1,9 @@
-#include "base.h"
-
-#if DISTRIBUTED
 
 #include "dmlc/data.h"
 #include "data/row_block.h"
 #include "../base/localizer.h"
 #include "../base/minibatch_iter.h"
-
-#else
-
-#include "local/data.h"
-#include "local/row_block.h"
-
-#endif
+#include "ps.h"
 
 #include <iostream>
 #include <cstring>
@@ -37,7 +28,7 @@ void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 	dmlc::Stream *file = dmlc::Stream::Create(featureFile, "r", true);
 	if (file == NULL)
 	{
-		std::cerr << "File doesn't exist\n";
+		std::cerr << "Feature File: " << featureFile << " :doesn't exist\n";
 		//exit(-1);
 	}
 	else
@@ -160,15 +151,22 @@ using real_t = dmlc::real_t;
 } //namespace dddml
 
 
-/*
-int main()
+
+namespace ps {
+App* App::Create(int argc, char *argv[]) {
+  return NULL;
+}
+}  // namespace ps
+
+
+int main(int argc, char *argv[])
 {
 	using namespace dddml;
 	std::random_device rd;
 	std::mt19937_64 rng (rd());	
 	char featureFile[] = "features.txt";
-	char data_directory[] = "./data/mnist.txt";
-	char outputFile[] = "./data/mnist.out";
+	char data_directory[] = "../data/mnist";
+	char outputFile[] = "../data/mnist.out";
 	char data_format[] = "libsvm";
 	int subsample_size = 1000;
 	int total_size = 60000;
@@ -177,11 +175,6 @@ int main()
 	
 	return 0;
 }
-
-*/
-
-
-
 
 
 
