@@ -160,7 +160,7 @@ using real_t = dmlc::real_t;
 } //namespace dddml
 
 
-
+/*
 int main()
 {
 	using namespace dddml;
@@ -178,7 +178,7 @@ int main()
 	return 0;
 }
 
-
+*/
 
 
 

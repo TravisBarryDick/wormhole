@@ -1,9 +1,9 @@
 include ../../make/ps_app.mk
 
-CFLAGS  = -O0 -ggdb -Wall -std=c++11 -I./ -I../ $(INCLUDE) $(DMLC_CFLAGS)  $(EXTRA_CFLAGS)
-LDFLAGS = $(CORE_PATH)/libdmlc.a $(DMLC_LDFLAGS)  $(EXTRA_LDFLAGS)
+CFLAGS  = -O0 -ggdb -Wall -std=c++11 -I./ -I../ $(INCLUDE) $(DMLC_CFLAGS) $(PS_CFLAGS) $(EXTRA_CFLAGS)
+LDFLAGS = $(CORE_PATH)/libdmlc.a $(DMLC_LDFLAGS) $(PS_LDFLAGS) $(EXTRA_LDFLAGS)
 
-all: base core bin #ps # tool # test
+all: base core bin ps # tool # test
 
 clean:
 	rm -rf build/*
@@ -24,7 +24,7 @@ build/%.o: %.cc
 %.pb.cc %.pb.h : %.proto
 	${DEPS_PATH}/bin/protoc --cpp_out=. --proto_path=. $<
 
-build/datasplit: build/datasplit.o  ../base/base.a       #$(PS_PATH)/build/libps.a
+build/datasplit: build/datasplit.o  ../base/base.a   $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 -include build/*.d
