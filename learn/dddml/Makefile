@@ -24,7 +24,7 @@ build/%.o: %.cc
 %.pb.cc %.pb.h : %.proto
 	${DEPS_PATH}/bin/protoc --cpp_out=. --proto_path=. $<
 
-build/datasplit: build/config.pb.o build/datasplit.o  ../base/base.a       #$(PS_PATH)/build/libps.a
+build/datasplit: build/datasplit.o  ../base/base.a       #$(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 -include build/*.d
