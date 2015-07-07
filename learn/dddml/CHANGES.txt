@@ -1,0 +1,1 @@
+1. Add Str2T for T = unsigned long long in strtonum.h

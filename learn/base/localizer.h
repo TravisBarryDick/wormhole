@@ -1,6 +1,7 @@
 #pragma once
 #include <type_traits>
 #include <limits>
+#include <gflags/gflags.h>
 #include "dmlc/data.h"
 #include "dmlc/omp.h"
 #include "data/row_block.h"
