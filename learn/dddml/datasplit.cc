@@ -14,7 +14,7 @@
 #include "sample_helper.h"
 
 namespace dddml{
-using FeaID = unsigned;
+using FeaID = int;
 using namespace dmlc;
 using namespace dmlc::data;
 
@@ -162,10 +162,10 @@ using real_t = dmlc::real_t;
 	
 	//First write idx_dict. Then write compressed sample.
 
-	dmlc::Stream *output = (dmlc::Stream *) dmlc::Stream::Create(outputFile, "w");
+	dmlc::Stream *output = dmlc::Stream::Create(outputFile, "w");
 	output->Write(*idx_dict);
 	sample_compressed->Save(output);
-	
+	std::cout << "Done sampling" << std::endl;
 	delete output;
 }
 

@@ -40,17 +40,22 @@ void run_benchmark(string prefix, function<int(Row<int>)> f,
 }
 
 int main(int argc, char *args[]) {
+
+  int nfeature = 784;
+  vector<int> feature_dict(nfeature);
+  for (int i = 0; i < nfeature; ++i) feature_dict[i] = i;  
+  
   int seed = argc > 1 ? atoi(args[1]) : 0;
-  int num_to_search = argc > 2 ? atoi(args[2]) : 5000;
+  int num_to_search = argc > 2 ? atoi(args[2]) : 1000;
 
   mt19937_64 rng(seed);
   auto data = libsvmread("./mnist.txt");
-  vector<int> idxs(num_to_search);
+  vector<size_t> idxs(num_to_search);
   for (size_t i = 0; i < idxs.size(); ++i)
     idxs[i] = i;
   // Benchmark RPTrees for various values of n0
   for (int n0 = 10; n0 <= num_to_search; n0 *= 2) {
-    RandomPartitionTree<int> rpt(rng, 784, n0, data, idxs);
+    RandomPartitionTree<int> rpt(rng, nfeature, n0, data, idxs, feature_dict);
     auto rpt_lookup = bind(&RandomPartitionTree<int>::find_nn, &rpt, _1);
     ostringstream name;
     name << "rpt(n0 = " << n0 << "): ";
@@ -64,7 +69,7 @@ int main(int argc, char *args[]) {
   };
   run_benchmark("random neighbor: ", random_idx, data, idxs.size());
   // Benchmark exhaustive search
-  RandomPartitionTree<int> rpt_exhaustive(rng, 784, idxs.size(), data, idxs);
+  RandomPartitionTree<int> rpt_exhaustive(rng, nfeature, idxs.size(), data, idxs, feature_dict);
   auto exhaustive_nn =
       bind(&RandomPartitionTree<int>::find_nn, &rpt_exhaustive, _1);
   run_benchmark("exact nn search: ", exhaustive_nn, data, idxs.size());
