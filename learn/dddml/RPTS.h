@@ -214,7 +214,7 @@ IndexType RandomPartitionTree<IndexType>::find_nn(dmlc::Row<IndexType> row) {
   real_t min_dist = std::numeric_limits<real_t>::infinity();
   IndexType best_idx;
   for (IndexType idx : *leaf_idxs) {
-    real_t dist = squareDistBetweenRows(row, data.GetBlock()[idx]);
+    real_t dist = squareDist(row, data.GetBlock()[idx]);
     if (dist < min_dist) {
       min_dist = dist;
       best_idx = idx;

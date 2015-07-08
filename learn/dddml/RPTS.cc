@@ -20,7 +20,7 @@ using namespace dmlc::data;
 auto query_dist(function<int(Row<int>)> f, const RowBlockContainer<int> &data,
                 Row<int> row) -> real_t {
   int nnidx = f(row);
-  return sqrt(squareDistBetweenRows(data.GetBlock()[nnidx], row));
+  return sqrt(squareDist(data.GetBlock()[nnidx], row));
 }
 
 void run_benchmark(string prefix, function<int(Row<int>)> f,
