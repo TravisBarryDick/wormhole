@@ -1,3 +1,4 @@
 1. Add Str2T for T = unsigned long long in strtonum.h
 2. Modify SDot in dmlc/data.h to return inner product
 3. Fix order of reading/writing rbc.index and rbc.value in Stream::Read(std::vector<I> *) and Stream::Write(std::vector<I> &) in dlmc-core/src/data/row_block.h
+4. Include "gflags/gflags.h" in localizer.
