@@ -1,6 +1,6 @@
 include ../../make/ps_app.mk
 
-CFLAGS  = -O0 -ggdb -Wall -std=c++11 -I./ -I../ $(INCLUDE) $(DMLC_CFLAGS) $(PS_CFLAGS) $(EXTRA_CFLAGS)
+CFLAGS  = -O0 -ggdb -std=c++11 -I./ -I../ $(INCLUDE) $(DMLC_CFLAGS) $(PS_CFLAGS) $(EXTRA_CFLAGS) #-Wall
 LDFLAGS = $(CORE_PATH)/libdmlc.a $(DMLC_LDFLAGS) $(PS_LDFLAGS) $(EXTRA_LDFLAGS)
 
 all: base core bin ps # tool # test
@@ -26,5 +26,9 @@ build/%.o: %.cc
 
 build/datasplit: build/datasplit.o  ../base/base.a   $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
+
+build/trial: build/trial.o  ../base/base.a   $(PS_PATH)/build/libps.a
+	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
+
 
 -include build/*.d

@@ -1,6 +1,7 @@
 
 #include "dmlc/data.h"
 #include "data/row_block.h"
+#include "dmlc/io.h"
 #include "../base/localizer.h"
 #include "../base/minibatch_iter.h"
 #include "ps.h"
@@ -9,6 +10,7 @@
 #include <cstring>
 #include <algorithm>
 #include <random>
+#include <vector>
 #include "sample_helper.h"
 
 namespace dddml{
@@ -22,13 +24,25 @@ using namespace dmlc::data;
 	TO-DO: 1. get args from conf file
 */
 
+#if 0
+template <typename I>
+void print(const dmlc::Row<I> &row)
+{
+	using namespace std;
+	for (size_t i = 0; i < row.length; ++i)
+	{
+		cout << row.index[i] << ':' << row.value[i] << ' ';
+	}
+	cout << endl;
+}
+#endif
 
 void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 {
 	dmlc::Stream *file = dmlc::Stream::Create(featureFile, "r", true);
 	if (file == NULL)
 	{
-		std::cerr << "Feature File: " << featureFile << " :doesn't exist\n";
+		std::cerr << "Feature File: " << featureFile << ", doesn't exist\n";
 		//exit(-1);
 	}
 	else
@@ -85,12 +99,14 @@ using real_t = dmlc::real_t;
 		partID;
 
 	std::uniform_real_distribution<> dist(0, 1);
-	std::uniform_int_distribution<int> dis(0, nPartToRead - 1);
+	std::uniform_int_distribution<int> dis(0, nPartPerFile - 1);
 	
 	real_t probability_of_selecting_one_row = (static_cast<real_t> (subsample_size)) / total_size * nPartPerFile / nPartToRead; //TODO: Check.
 	probability_of_selecting_one_row = (probability_of_selecting_one_row > 1.0) ? 1.0 : probability_of_selecting_one_row;
 		
 	/* Step 2: Read some of the blocks at random, and sub-sample */
+	
+	int nread = 0, naccept = 0;
 	
 	dmlc::data::RowBlockContainer<FeaID> sample;
 	dmlc::data::RowBlockContainer<FeaID> *sample_compressed = new dmlc::data::RowBlockContainer<FeaID>();
@@ -112,8 +128,10 @@ using real_t = dmlc::real_t;
 				for (size_t i = 0; i < mb.size; ++i)
 				{
 					//decide whether to add row mb[i] to the sample or not
+					++nread;
 					if (dist(rng) < probability_of_selecting_one_row)
 					{
+						++naccept;
 						sample.Push(mb[i]);
 					}
 					
@@ -121,6 +139,7 @@ using real_t = dmlc::real_t;
 			}
 		}
 	}
+	
 	/* Step 3: Localize */
 	dmlc::RowBlock<unsigned> sample1 = sample.GetBlock();
 	/* 3.1: read feature file */
@@ -132,6 +151,7 @@ using real_t = dmlc::real_t;
 	dmlc::Localizer <FeaID> lc;
 	std::vector<FeaID> *uidx = new std::vector<FeaID>();
 	lc.CountUniqIndex<FeaID>(sample1, /*4,*/ uidx, NULL); //include nthreads = 4 for older version
+	
 	/* 3.3: intersect uidx with features */
 	std::vector<FeaID> *idx_dict = Intersect(features, *uidx);
 	/* 3.4: localize */
@@ -142,10 +162,11 @@ using real_t = dmlc::real_t;
 	
 	//First write idx_dict. Then write compressed sample.
 
-	dmlc::Stream *output = dmlc::Stream::Create(outputFile, "w");
+	dmlc::Stream *output = (dmlc::Stream *) dmlc::Stream::Create(outputFile, "w");
 	output->Write(*idx_dict);
 	sample_compressed->Save(output);
 	
+	delete output;
 }
 
 } //namespace dddml
@@ -172,6 +193,7 @@ int main(int argc, char *argv[])
 	int total_size = 60000;
 
 	subsample(featureFile, data_directory, outputFile,data_format, subsample_size, total_size, rng);
+	
 	
 	return 0;
 }
