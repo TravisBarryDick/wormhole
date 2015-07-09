@@ -57,9 +57,34 @@ private:
   vector<real_t> d; // The direction for the split
   real_t t;         // The split point
   vector<IndexType> *feature_dict_ptr; // feature map
+  
+  real_t SparseDot(Row<IndexType> row);
 };
 
 // *** RPTSplit Definitions *** //
+
+template <typename IndexType>
+real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
+	size_t i,j;
+	dmlc::real_t dotProduct = 0.0;
+	for (i = 0, j = 0; (i < r1.length && j < feature_dict_ptr->size()); )
+	{
+		if (r1.index[i] == (*feature_dict_ptr)[j])
+		{
+			dotProduct += (r1.value[i] * d[j]);
+			++i; ++j;
+		}
+		else if (r1.index[i] > (*feature_dict_ptr)[j])
+		{
+			++j;
+		}
+		else
+		{			
+			++i;
+		}
+	}
+	return dotProduct;
+}
 
 template <typename IndexType>
 RPTSplit<IndexType>::RPTSplit(std::vector<IndexType> *feature_dict_ptr) : d(0), t(0), feature_dict_ptr(feature_dict_ptr) {}
@@ -78,7 +103,8 @@ RPTSplit<IndexType>::RPTSplit(mt19937_64 &rng, size_t dimension,
   // project each sample onto d
   vector<real_t> ps(idxs.size());
   for (size_t i = 0; i < idxs.size(); ++i) {
-    ps[i] = data[idxs[i]].SDot(d.data(), dimension); //TODO: Change
+    //ps[i] = data[idxs[i]].SDot(d.data(), dimension);
+    ps[i] = SparseDot(data[idxs[i]]);
   }
   // Pick a random fractile between 1/4 and 3/4
   real_t fractile = std::uniform_real_distribution<real_t>(0.25, 0.75)(rng);
@@ -90,7 +116,8 @@ RPTSplit<IndexType>::RPTSplit(mt19937_64 &rng, size_t dimension,
 
 template <typename IndexType>
 inline auto RPTSplit<IndexType>::route(Row<IndexType> row) -> RouteDirection {
-  real_t p = row.SDot(d.data(), d.size()); //TODO: change
+  //real_t p = row.SDot(d.data(), d.size());
+  real_t p = SparseDot(row);
   return (p > t) ? RIGHT : LEFT;
 }
 
@@ -134,7 +161,7 @@ public:
   
   /* Disk IO functions */
   void Save(dmlc::Stream *fo);
-  static unique_ptr<RPTNode<IndexType>> Load(dmlc::Stream *fi);
+  static unique_ptr<RPTNode<IndexType>> Load(dmlc::Stream *fi, std::vector<IndexType> *feature_dict_ptr);
   
 private:
   unique_ptr<RPTNode<IndexType>> left;
@@ -184,7 +211,7 @@ inline void RPTNode<IndexType>::Save(dmlc::Stream *fo)
 }
 
 template <typename IndexType>
-static unique_ptr<RPTNode<IndexType>> Load(dmlc::Stream *fi, std::vector<IndexType> *feature_dict_ptr)
+unique_ptr<RPTNode<IndexType>> RPTNode<IndexType>::Load(dmlc::Stream *fi, std::vector<IndexType> *feature_dict_ptr)
 {
   bool isLeaf;
   fi->Read(&(isLeaf), sizeof(bool));
@@ -270,17 +297,22 @@ public:
 
   auto depth() -> size_t;
 
-  auto find_nn(dmlc::Row<IndexType> row) -> IndexType;
+  auto find_nn(dmlc::Row<IndexType> row) -> size_t;
 
   auto get_rowblock() -> const dmlc::data::RowBlockContainer<IndexType> &;
   
-  void Save(dmlc::Stream *);
+  /* File IO functions */
+  void Save(dmlc::Stream*);
+  void Save(const char*);
   RandomPartitionTree(dmlc::Stream*, dmlc::Stream*);
+  RandomPartitionTree(const char*, const char*);
 
 private:
   std::vector<IndexType> feature_dict;
   dmlc::data::RowBlockContainer<IndexType> data;
   std::unique_ptr<rpt_impl::RPTNode<IndexType>> tree;
+  
+  inline dmlc::real_t SquareDist(const dmlc::Row<IndexType> &r1, size_t index);
 };
 
 // *** RandomPartitionTree Definitions *** //
@@ -311,13 +343,47 @@ template <typename IndexType> size_t RandomPartitionTree<IndexType>::depth() {
   return tree->depth();
 }
 
+
+/*
+* Finds square distance between row and a datapoint index by `index'
+* r1: row with global indices
+* index: index to datapoint, we want to compare to
+*/
 template <typename IndexType>
-IndexType RandomPartitionTree<IndexType>::find_nn(dmlc::Row<IndexType> row) { //TODO: change
+inline dmlc::real_t RandomPartitionTree<IndexType>::SquareDist(const dmlc::Row<IndexType> &r1, size_t index)
+{
+	auto r2 = this->data.GetBlock()[index]; // convenient name
+	size_t i,j;
+	dmlc::real_t sqdist = 0.0;
+	for (i = 0, j = 0; (i < r1.length && j < r2.length); )
+	{
+		if (r1.index[i] == feature_dict[r2.index[j]])
+		{
+			sqdist += (r1.value[i] - r2.value[j])*(r1.value[i] - r2.value[j]);
+			++i; ++j;
+		}
+		else if (r1.index[i] > feature_dict[r2.index[j]])
+		{
+			sqdist += (r2.value[j])*(r2.value[j]);
+			++j;
+		}
+		else
+		{
+			sqdist += (r1.value[i])*(r1.value[i]);
+			++i;
+		}
+	}
+	return sqdist;
+}
+
+template <typename IndexType>
+size_t RandomPartitionTree<IndexType>::find_nn(dmlc::Row<IndexType> row) { 
   auto leaf_idxs = tree->search(row);
-  real_t min_dist = std::numeric_limits<real_t>::infinity();
-  IndexType best_idx;
-  for (IndexType idx : *leaf_idxs) {
-    real_t dist = squareDist(row, data.GetBlock()[idx]);
+  dmlc::real_t min_dist = std::numeric_limits<dmlc::real_t>::infinity();
+  size_t best_idx;
+  for (size_t idx : *leaf_idxs) {
+  	//dmlc::real_t dist = squareDist(row, data.GetBlock()[idx]);
+    dmlc::real_t dist = SquareDist(row, idx);
     if (dist < min_dist) {
       min_dist = dist;
       best_idx = idx;
@@ -334,24 +400,32 @@ RandomPartitionTree<IndexType>::get_rowblock() {
 
 
 template <typename IndexType>
-void RandomPartitonTree<IndexType>::Save(dmlc::Stream *fo)
+void RandomPartitionTree<IndexType>::Save(dmlc::Stream *fo)
 {
   tree->Save(fo);
 }
 
 template <typename IndexType>
-RandomPartitionTree<IndexType>::Load(dmlc::Stream *dataFile, dmlc::Stream *treeFile)
+void RandomPartitionTree<IndexType>::Save(const char *filename)
+{
+  dmlc::Stream *fo = dmlc::Stream::Create(filename, "w");
+  tree->Save(fo);
+  delete fo;
+}
+
+template <typename IndexType>
+RandomPartitionTree<IndexType>::RandomPartitionTree(dmlc::Stream *dataFile, dmlc::Stream *treeFile)
 {
   //read features
   dataFile->Read(&feature_dict);
   //read data
   data.Load(dataFile);
   //read tree
-  tree = read_rptree(treeFile, &feature_dict);
+  tree = rpt_impl::read_rptree(treeFile, &feature_dict);
 }
 
 template <typename IndexType>
-RandomPartitionTree<IndexType>::Load(const char *dataFilename, const char *treeFilename)
+RandomPartitionTree<IndexType>::RandomPartitionTree(const char *dataFilename, const char *treeFilename)
 {
   dmlc::Stream *dataFile = dmlc::Stream::Create(dataFilename, "r");
   dmlc::Stream *treeFile = dmlc::Stream::Create(treeFilename, "r");
@@ -360,15 +434,10 @@ RandomPartitionTree<IndexType>::Load(const char *dataFilename, const char *treeF
   //read data
   data.Load(dataFile);
   //read tree
-  tree = read_rptree(treeFile, &feature_dict);
+  tree = rpt_impl::read_rptree(treeFile, &feature_dict);
+  delete dataFile;
+  delete treeFile;
 }
-
-
-
-
-
-
-
 
 };
 #endif

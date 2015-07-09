@@ -14,7 +14,7 @@
 #include "sample_helper.h"
 
 namespace dddml{
-using FeaID = int;
+using FeaID = unsigned;
 using namespace dmlc;
 using namespace dmlc::data;
 
@@ -93,7 +93,7 @@ using real_t = dmlc::real_t;
 	
 	/* Step 1: Figure out number of files */
 	int nFiles = 1,
-		nPartPerFile = 1000,
+		nPartPerFile = 100,
 		nPartToRead = 10,
 		mb_size = 1000,
 		partID;
@@ -102,6 +102,7 @@ using real_t = dmlc::real_t;
 	std::uniform_int_distribution<int> dis(0, nPartPerFile - 1);
 	
 	real_t probability_of_selecting_one_row = (static_cast<real_t> (subsample_size)) / total_size * nPartPerFile / nPartToRead; //TODO: Check.
+	std::cerr << "Probability of selecting a row: " << probability_of_selecting_one_row << std::endl;
 	probability_of_selecting_one_row = (probability_of_selecting_one_row > 1.0) ? 1.0 : probability_of_selecting_one_row;
 		
 	/* Step 2: Read some of the blocks at random, and sub-sample */
@@ -189,7 +190,7 @@ int main(int argc, char *argv[])
 	char data_directory[] = "../data/mnist";
 	char outputFile[] = "../data/mnist.out";
 	char data_format[] = "libsvm";
-	int subsample_size = 1000;
+	int subsample_size = 10000;
 	int total_size = 60000;
 
 	subsample(featureFile, data_directory, outputFile,data_format, subsample_size, total_size, rng);
