@@ -1,0 +1,7 @@
+package dddml;
+
+message DispatcherConfig {
+    optional string train_data = 1;
+    optional string test_data = 2;
+    optional string data_format = 4 [default = "libsvm"];
+}
