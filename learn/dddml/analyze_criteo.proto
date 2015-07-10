@@ -1,0 +1,17 @@
+package dddml;
+
+message DispatcherConfig {
+    optional string input_data = 1;
+    optional string input_format = 2;
+    optional int32 n_files = 3;
+    optional int32 n_parts_per_file = 4;
+    optional int32 mb_size = 5;
+    optional int32 n_part_to_read = 6;
+	
+	optional int32 n_features_to_pick = 7; // save the IDs of the top how many features?
+	optional string feature_file_name = 8; // name of feature file
+	
+    //optional string dispatch_data = 7;     // The dispatch data
+    //optional string dispatch_clusters = 8; // The clustering of the dispatch data
+    //optional string dispatch_tree = 9;     // The tree structure on the dispatch data
+}
