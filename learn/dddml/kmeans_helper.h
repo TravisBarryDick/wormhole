@@ -19,6 +19,7 @@
 #include <vector>
 #include <cassert>
 #include <queue>
+#include <memory>
 
 namespace dddml{
 using namespace dmlc;
@@ -47,7 +48,7 @@ public:
 	{
 		return &(array[row_id * dim]);
 	}
-	// real_t* const operator[](size_t row_id) 
+	// real_t* const operator[](size_t row_id)
 	// {
 	// 	return &(array[row_id * dim]);
 	// }
@@ -58,7 +59,7 @@ public:
 		array = new real_t[dim*k];
 		std::memset(array, 0, sizeof(real_t)*dim*k);
 	}
-	~centers_t(){} 
+	~centers_t(){}
 	// no automatic destructor. Call destroy() on completion
 	void destroy()
 	{
@@ -71,7 +72,7 @@ public:
 	{
 		std::memset(array, 0, sizeof(real_t) * dim * k);
 	}
-	
+
 };
 
 
@@ -185,13 +186,13 @@ inline void reset(real_t *array, size_t dim)
 
 template <typename I>
 inline void add_into(real_t *arr, size_t dim, const Row<I> &r1)
-{	
+{
 	CHECK(arr != NULL);
 	CHECK(r1.index[r1.length - 1] < dim);
 	for(size_t i = 0; i < r1.length; ++i)
-	{ 
+	{
 		arr[r1.index[i]] += r1.weight * r1.value[i];
-		
+
 	}
 }
 
@@ -262,7 +263,7 @@ int find_closest(const Row<I> &row, centers_t &centers)
 		{
 			min_dist = cur_dist;
 			min_index = i;
-		} 
+		}
 	}
 	return min_index;
 }
@@ -290,8 +291,8 @@ int find_closest(centers_t &all_centers, int center)
 			{
 				min_dist = cur_dist;
 				min_index = i;
-			} 
-		}	
+			}
+		}
 	}
 	return min_index;
 }
@@ -336,7 +337,25 @@ int *find_p_closest(int p, const Row<I> &row,  centers_t &centers)
 	}
 }
 
+///////////////////////////////////////////////
+// Saving and Reading Clustering Assignments //
+///////////////////////////////////////////////
 
+void save_assignments(dmlc::Stream *fo,
+                      const std::vector<std::vector<int>> *assignments) {
+  size_t n = assignments->size();
+	fo->Write(&n, sizeof(size_t));
+	for (size_t i = 0; i < n; ++i) {
+		fo->Write((*assignments)[i]);
+	}
+}
 
+bool read_assignments(dmlc::Stream* fi, std::vector<std::vector<int>> * assignments) {
+	size_t n; fi->Read(&n, sizeof(size_t));
+	assignments->resize(n);
+	for (size_t i = 0; i < n; ++i) {
+		fi->Read(&(*assignments)[i]);
+	}
+}
 
 }//namespace dddml
