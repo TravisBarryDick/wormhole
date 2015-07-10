@@ -1,7 +1,13 @@
 package dddml;
 
 message DispatcherConfig {
-    optional string train_data = 1;
-    optional string test_data = 2;
-    optional string data_format = 4 [default = "libsvm"];
+    optional string input_data = 1;
+    optional string input_format = 2;
+    optional int32 n_files = 3;
+    optional int32 n_parts_per_file = 4;
+    optional int32 mb_size = 5;
+
+    optional string dispatch_data = 7;     // The dispatch data
+    optional string dispatch_clusters = 8; // The clustering of the dispatch data
+    optional string dispatch_tree = 9;     // The tree structure on the dispatch data
 }
