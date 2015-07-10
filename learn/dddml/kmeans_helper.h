@@ -26,14 +26,9 @@
 namespace dddml{
 using namespace dmlc;
 /*
-* Class for possible types of centers
+* Class for centers
 *
 */
-
-//typedef std::size_t size_t //TODO
-
-//inline real_t square(real_t x){ return x*x;}
-
 
 typedef std::shared_ptr<std::vector<int>> vector_int_ptr;
 
@@ -343,6 +338,8 @@ int *find_p_closest(int p, const Row<I> &row,  centers_t &centers)
 // Saving and Reading Clustering Assignments //
 ///////////////////////////////////////////////
 
+#if DISTRIBUTED
+
 void save_assignments(dmlc::Stream *fo,
                       const std::vector<std::vector<int>> *assignments) {
   size_t n = assignments->size();
@@ -375,5 +372,6 @@ void read_assignments(const char *inpath,
   read_assignments(instream, assignments);
   delete instream;
 }
+#endif
 
 }//namespace dddml

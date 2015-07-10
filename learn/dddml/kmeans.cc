@@ -7,6 +7,7 @@
 #include <queue>
 #include <array>
 #include <algorithm>
+#include <sstream>
 
 #if DISTRIBUTED 
 
@@ -15,6 +16,9 @@
 #include <dmlc/io.h>
 #include "data/row_block.h"
 #include <dmlc/timer.h>
+
+#include "base/arg_parser.h"
+#include "ps.h"
 
 #else
 
@@ -39,11 +43,6 @@ namespace dddml{
 using namespace dmlc;
 using namespace dmlc::data;
 
-// template<typename I>
-// using center_t_ptr = std::shared_ptr<center_t<I>>;
-
-// template<typename I>
-// using vector_center_ptr = std::shared_ptr<std::vector<center_t_ptr<I>>>;
 
 
 
@@ -456,6 +455,7 @@ std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int 
 }
 
 
+#if ~DISTRIBUTED
 template<typename I>
 void save_data_to_file(const char * filename, const RowBlock<I> &data, vector_int_ptr assignments, Stream *fo = NULL)
 {
@@ -474,7 +474,7 @@ void save_centers_to_file(Stream *fo, centers_t &centers)
 {
 	//TODO
 }
-
+#endif
 
 /*
 *	MERGE AND SPLIT HEURISTICS:
@@ -585,8 +585,122 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 		int temp = (*assignments)[j] - current_k;
 		if (temp >= 0) (*assignments)[j] = deleted_indices[temp];
 	}
-//	for (int j = 0; j < assignments->size(); ++j)
-//		std::cout << (*assignments)[j] << ' ' ;
+	#if DISTRIBUTED
+	LOG(INFO) << "Merged: " << nmerge << " and split " << nsplit << ".\n Old k: " << k << "; Current k: " << current_k;
+	#else
+	std::cout << "Merged: " << nmerge << " and split " << nsplit << ".\n Old k: " << k << "; Current k: " << current_k << std::endl;
+	#endif
+	return current_k;
+}
+
+/* p > 1 */
+template <typename I>
+int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, centers_t &centers, real_t lower_bound, real_t upper_bound, int k, size_t dim, std::mt19937_64 &rng)
+{
+	//preprocess
+	int current_k = k, p = (*assignments)[0].size();
+	real_t current_lower = lower_bound,
+			current_upper = upper_bound;
+	int counts[k] ; 
+	for (int i = 0; i < k; ++i) counts[i] = 0;
+	int nmerge = 0,  nsplit = 0;
+	for (int i = 0; i < assignments->size(); ++i)
+	{
+		for (int j = 0; j < p; ++j)
+		++counts[(*assignments)[i][j]];
+	}
+	std::vector<int> permutation(k);
+	std::vector<int> deleted_indices;
+	std::cout << current_k << std::endl;
+	//merge
+	for (int i = 0; i < k; ++i) permutation[i] = i;
+	std::shuffle(permutation.begin(), permutation.end(), rng);
+	for (int i: permutation)
+	{
+		if (counts[i] >= 0 && counts[i] < current_lower)
+		{
+			//cluster too small. Need to merge it with nearest cluster.
+			deleted_indices.push_back(i);
+			int new_index = find_closest(centers, i);
+			++nmerge;
+			counts[new_index] += counts[i];
+			counts[i] = -1; //destroyed cluster
+			--current_k;
+			std::cout << "Merged cluster " << i << " with cluster " << new_index << std::endl;
+			for (int j = 0; j < assignments->size(); ++j)
+			{
+				for (int h = 0; h < p; ++h)
+					if ((*assignments)[j][h] == i) (*assignments)[j][h] = new_index;
+			}
+			//update center:
+			update_one_center(centers, data, (*assignments), new_index);
+		}
+	}
+	//modify upper bound (it gets looser) and leave lower bound intact
+	current_upper *= k / current_k;
+	
+	
+	
+	//split
+	for (int i = 0; i < k; ++i) permutation[i] = i;
+	std::shuffle(permutation.begin(), permutation.end(), rng);
+	int current_index = k; //starting index for new clusters formed
+	for (int i: permutation)
+	{ 
+		if (counts[i] >= 0 && counts[i] > current_upper)
+		{
+			//cluster too big. Need to split.
+			nsplit++;
+			int num_new_clusters_for_this_cluster = counts[i] / current_upper + (counts[i] != current_upper); //ceil
+			std::cout << "split cluster " << i << " to clusters " << current_index  << " ... " << (current_index + num_new_clusters_for_this_cluster - 1) << std::endl;
+			deleted_indices.push_back(i); //delete this index
+			std::vector<int> ones = _ones(num_new_clusters_for_this_cluster);
+			std::discrete_distribution<int> dis (ones.begin(), ones.end());
+			for (int j = 0; j < assignments->size(); ++j)
+			{
+				for (int h = 0; h < p; ++h)
+				{
+					if ((*assignments)[j][h] == i)  //ramdomly assign to one of the split clusters
+					{
+						int temp = dis(rng);
+						//std::cout << '*' << temp << std::endl;
+						(*assignments)[j][h] = temp + current_index;
+					}
+				}
+			}
+			current_index += num_new_clusters_for_this_cluster; //next cluster starts from this index
+			/*
+			if we split into t clusters, t-1 new clusters are formed
+			*/
+			current_k += (num_new_clusters_for_this_cluster - 1);	
+		}
+	}
+	
+	//pre-clean-up
+	int counts1[current_index];
+	for (int i = 0; i < current_index; ++i) {counts1[i] = 0; }
+
+	for (int i = 0; i < assignments->size(); ++i)
+	{	
+		for (int j = 0; j < p; ++j)
+		{
+			int cl = (*assignments)[i][j];
+			++counts1[cl];
+		}
+	}
+	for (int i = 0; i < current_index; ++i) {std::cout << i << ": " << counts1[i] << std::endl; }
+	
+	
+	//clean-up
+	//re-map indices >=current_k to deleted indices
+	for (int j = 0; j < assignments->size(); ++j)
+	{
+		for (int h = 0; h < p; ++h)
+		{
+			int temp = (*assignments)[j][h] - current_k;
+			if (temp >= 0) (*assignments)[j][h] = deleted_indices[temp];
+		}
+	}
 	#if DISTRIBUTED
 	LOG(INFO) << "Merged: " << nmerge << " and split " << nsplit << ".\n Old k: " << k << "; Current k: " << current_k;
 	#else
@@ -599,8 +713,121 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 
 } //namespace dddml
 
+#if DISTRIBUTED
+namespace ps {
+App* App::Create(int argc, char *argv[]) {
+  return NULL;
+}
+}  // namespace ps
 
 
+using FeaID = unsigned;
+using myPair = std::pair<std::vector<FeaID>*, dmlc::data::RowBlockContainer<FeaID>*>;
+
+myPair readSamplingOutput(const char filename[])
+{
+	dmlc::Stream *output = dmlc::Stream::Create(filename, "r");
+	std::vector<FeaID> *idx = new std::vector<FeaID>();
+	dmlc::data::RowBlockContainer<FeaID> *data = new dmlc::data::RowBlockContainer<FeaID>();
+	// read indices
+	bool read = output->Read(idx);
+	// read rowblock
+	data->Load(output);
+	return myPair(idx, data);
+}
+	
+	
+int main(int argc, char *argv[])
+{
+	using namespace dddml;
+	using namespace std;
+	using namespace dmlc;
+	ArgParser parser;
+	if (argc > 1 && strcmp(argv[1], "none")) parser.ReadFile(argv[1]);
+	parser.ReadArgs(argc - 2, argv + 2);
+	DispatcherConfig conf;
+	parser.ParseToProto(&conf);
+	
+	
+	std::random_device rd; 
+	std::mt19937_64 rng(rd());
+	
+	/*
+		Parameters:
+			- n_clusters: K: number of clusters
+			- replication_factor: p: replication factor
+			- cluster_lower_bound: l: lower bound (fraction)
+			- cluster_upper_bound: L: upper bound (fraction)
+			- data_file: file with idx_map and localized row block
+			- assignments_file: file to write assignments to
+	*/
+	
+	int k = conf.n_clusters(),
+		p = conf.replication_factor();
+	real_t lfrac = conf.cluster_lower_bound(),
+		Lfrac = conf.cluster_upper_bound();
+	stringstream data_file_stram, out_file_stream;
+	data_file_stream << conf.data_file();
+	out_file_stream << conf.assignments_file();
+	std::string data_file_ data_file_stream.str(), out_file_ = out_file_stream.str();
+	const char *data_file = data_file_.c_str(), *out_file = out_file_.c_str();
+	
+	auto readpair = readSamplingOutput(data_file);
+	auto idx_dict = readpair.first;
+	int dim = idx_dict->size(); // dim = size of idx_dict
+	dmlc::data::RowBlockContainer<FeaID>* data_rbc = readpair.second;  // pointer to row block container with data
+	auto data = data_rbc->GetBlock();
+	int n = data.size;
+	
+	real_t lb = lfrac * n / k,
+			ub = Lfrac * n / k;
+	
+	auto output = kmeans(block,  k, p , dim, rng, 0);
+	auto assignments = output.first;
+	auto centers = output.second;
+	
+	//printing
+	int counts[k];
+	for (int i = 0; i < k; ++i) {counts[i] = 0;}
+
+	for (int i = 0; i < assignments->size(); ++i)
+	{
+		for (int j = 0; j < p; ++j)
+		{
+			int cl = (*assignments)[i][j];
+			++counts[cl];
+		}
+	}
+	for (int i = 0; i < k; ++i)
+	{
+		std::cout << i << ": " << counts[i] << "; " << std::endl;
+	}
+	std::cout << "-----------------------\n";
+	
+	
+	//heuristics
+	int new_k = merge_and_split(block, assignments, centers, lb, ub, k, dim, rng);
+	
+	//printing
+	int counts1[new_k];
+	for (int i = 0; i < new_k; ++i) {counts1[i] = 0; }
+
+	for (int i = 0; i < assignments->size(); ++i)
+	{
+		for (int j = 0; j < p; ++j)
+		{
+			int cl = (*assignments)[i][j];
+			++counts1[cl];
+		}
+	}
+	for (int i = 0; i < new_k; ++i)
+	{
+		std::cout << i << ": " << counts1[i] << "; " << std::endl;
+	}
+	centers.destroy();
+}
+
+#else
 int main()
 {
 	using namespace dddml;
@@ -614,17 +841,6 @@ int main()
 	int k = 10;
 	size_t dim = 784;
 
-
-	#if 0
-	for (int i = 0; i < block.size; ++i)
-	{
-		real_t dist = 1e230;
-		for (int j = 0; j < block.size; ++j)
-			if (i != j) dist = std::min(dist, squareDistBetweenRows(block[i], block[j]));
-		cout << dist << endl;
-	}
-	cout << block.size << endl << endl;
-	#endif
 	
 	//#if 0
 	auto output = kmeans(block,  k , /*dim */ dim, rng, 1);
@@ -673,4 +889,4 @@ int main()
 }
 
 
-
+#endif

@@ -38,4 +38,8 @@ build/dispatcher: build/dispatcher.o build/dispatcher_config.pb.o ../base/base.a
 build/analyze_criteo: build/analyze_criteo.pb.o build/analyze_criteo.o ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
+
+build/kmeans: build/kmeans.o  ../base/base.a   $(PS_PATH)/build/libps.a
+	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
+
 -include build/*.d

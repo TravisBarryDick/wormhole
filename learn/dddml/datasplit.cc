@@ -49,7 +49,7 @@ void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 	{
 		file->Read(features);
 	}
-
+	delete file;
 }
 
 std::vector<FeaID> *Intersect(std::vector<FeaID> &v1, std::vector<FeaID> &v2)
