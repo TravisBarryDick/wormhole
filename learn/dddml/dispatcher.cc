@@ -7,6 +7,8 @@
 #include "../base/localizer.h"
 #include "../base/minibatch_iter.h"
 #include "ps.h"
+#include "kmeans_helper.h"
+#include "RPTS.h"
 
 #include "dispatcher_config.pb.h"
 
@@ -27,10 +29,12 @@ int WorkerNodeMain(int argc, char* argv[]) {
   DispatcherConfig conf;
   parser.ParseToProto(&conf);
 
-  // Steps:
-  // 1. Read the dispatch data, cluster assignment, and tree
-  // 2. Use MyRank() and RankSize() to decide what parts of the file to read
-  // 3. Iterate through the part belonging to this worker and dispatch.
+  // Load the dispatching data and the dispatch tree
+  auto rpt = RandomPartitionTree<FeaID>(conf.dispatch_data().c_str(),
+                                        conf.dispatch_tree().c_str());
+  // Load the cluster assignments for the dispatch data
+  vector<vector<int>> assignments;
+  read_assignments(conf.dispatch_clusters().c_str(), &assignments);
 
   int parts_per_worker = conf.n_parts_per_file() / RankSize();
   int extra_parts = conf.n_parts_per_file() - RankSize() * parts_per_worker;
@@ -47,8 +51,6 @@ int WorkerNodeMain(int argc, char* argv[]) {
   for (int file_num = 0; file_num < conf.n_files(); ++file_num) {
     stringstream filename;
     filename << conf.input_data() << file_num;
-    cout << "Worker " << MyRank() << " opening parts " << first_part << "-"
-         << (first_part + num_parts - 1) << " of " << filename.str() << endl;
     for (size_t part = first_part; part < first_part + num_parts; ++part) {
       MinibatchIter<FeaID> reader(filename.str().c_str(), part,
                                   static_cast<size_t>(conf.n_parts_per_file()),
@@ -56,9 +58,18 @@ int WorkerNodeMain(int argc, char* argv[]) {
                                   static_cast<size_t>(conf.mb_size()));
       reader.BeforeFirst();
       while (reader.Next()) {
-        auto mb = reader.Value();  // mb is a RowBlock        
+        auto mb = reader.Value();
+        for (size_t i = 0; i < mb.size; ++i) {
+          size_t nn_idx = rpt.find_nn(mb[i]);
+          // TODO: Actually write output to appropriate files
+          vector<int>& clusters = assignments[nn_idx];
+          cout << "[";
+          for (size_t j  = 0; j < clusters.size(); ++j) {
+            cout << clusters[j] << " ";
+          }
+          cout << "]\n";
+        }
       }
     }
   }
-  cout << "Worker " << MyRank() << " done!" << endl;
 }
