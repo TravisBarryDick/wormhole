@@ -4,10 +4,12 @@
 
 #if DISTRIBUTED
 
+#include "dmlc/io.h"
 #include "dmlc/data.h"
 
 #else
 
+#include "local/io.h"
 #include "local/data.h"
 #include <iostream>
 
@@ -344,18 +346,34 @@ int *find_p_closest(int p, const Row<I> &row,  centers_t &centers)
 void save_assignments(dmlc::Stream *fo,
                       const std::vector<std::vector<int>> *assignments) {
   size_t n = assignments->size();
-	fo->Write(&n, sizeof(size_t));
-	for (size_t i = 0; i < n; ++i) {
-		fo->Write((*assignments)[i]);
-	}
+  fo->Write(&n, sizeof(size_t));
+  for (size_t i = 0; i < n; ++i) {
+    fo->Write((*assignments)[i]);
+  }
 }
 
-bool read_assignments(dmlc::Stream* fi, std::vector<std::vector<int>> * assignments) {
-	size_t n; fi->Read(&n, sizeof(size_t));
-	assignments->resize(n);
-	for (size_t i = 0; i < n; ++i) {
-		fi->Read(&(*assignments)[i]);
-	}
+void save_assignments(const char *outpath,
+                      const std::vector<std::vector<int>> *assignments) {
+  auto outstream = Stream::Create(outpath, "w");
+  save_assignments(outstream, assignments);
+  delete outstream;
+}
+
+void read_assignments(dmlc::Stream *fi,
+                      std::vector<std::vector<int>> *assignments) {
+  size_t n;
+  fi->Read(&n, sizeof(size_t));
+  assignments->resize(n);
+  for (size_t i = 0; i < n; ++i) {
+    fi->Read(&(*assignments)[i]);
+  }
+}
+
+void read_assignments(const char *inpath,
+                      std::vector<std::vector<int>> *assignments) {
+  auto instream = Stream::Create(inpath, "r");
+  read_assignments(instream, assignments);
+  delete instream;
 }
 
 }//namespace dddml
