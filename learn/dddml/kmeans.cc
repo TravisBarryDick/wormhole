@@ -262,7 +262,7 @@ centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 
 	{
 		//sample next center
 		int next_center = weightedSample(sqdists, numData, rng);
-		add_into(centers[0], dim, data[next_center]);
+		add_into(centers[i], dim, data[next_center]);
 
 		//update distances
 		for (int j = 0; j < numData; ++j)
