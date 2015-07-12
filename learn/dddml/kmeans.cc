@@ -84,11 +84,13 @@ bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector
 	std::vector<int> assignment;
 	for (size_t i = 0; i < n; ++i)
 	{
-		assignment = find_p_closest(p, data[i], centers, dim, k);
-		if (assignment != assignments[i])
+		auto p_closest = find_p_closest(p, data[i], centers);
+		for (size_t j = 0; j < p; ++j)
 		{
-			assignments[i] = assignment;
-			changed = true;
+			if (assignments[i][j] != p_closest[j]){
+				changed = true;
+				assignments[i][j] = p_closest[j];
+			}
 		}
 	}
 	return changed;
@@ -376,6 +378,7 @@ std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size
 		{
 			++counts[(*assignments)[i]];
 		}
+		std::cout << '\t';
 		for (int i = 0; i < k; ++i) std::cout << counts[i] << ' ';
 		std::cout << std::endl;
 		
@@ -397,7 +400,7 @@ std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size
 }
 
 template<typename I>
-std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, int center_type, std::mt19937_64 &rng, int init)
+std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, std::mt19937_64 &rng, int init)
 {
 	double start, time;
 	
@@ -439,9 +442,22 @@ std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int 
 	int iter_count = 0;
 	while(changed)
 	{
-		changed = update_assignments(centers, data, *assignments, dim, k);
-		update_centers(centers, data, *assignments, dim, k);
+		changed = update_assignments(centers, data, *assignments);
+		
+		int counts[k] ; 
+		for (int i = 0; i < k; ++i) counts[i] = 0;
+		for (int i = 0; i < assignments->size(); ++i)
+		{
+			for (int j = 0; j < p; ++j)
+				++counts[(*assignments)[i][j]];
+		}
+		std::cout << '\t';
+		for (int i = 0; i < k; ++i) std::cout << counts[i] << ' ';
+		std::cout << std::endl;
+		
+		update_centers(centers, data, *assignments);
 		++iter_count;
+		std::cout << iter_count << ": objective: " << kmeans_objective(data, assignments, centers) << std::endl;
 	}
 	time = GetTime() - start;
 
@@ -828,6 +844,7 @@ int main(int argc, char *argv[])
 }
 
 #else
+
 int main()
 {
 	using namespace dddml;
@@ -843,7 +860,7 @@ int main()
 
 	
 	//#if 0
-	auto output = kmeans(block,  k , /*dim */ dim, rng, 1);
+	auto output = kmeans(block,  k, /*p */ /*dim */ dim, rng, 1);
 	std::cout << "-----------------------\n";
 	vector_int_ptr assignments = output.first;
 	auto centers = output.second;
@@ -877,6 +894,72 @@ int main()
 	{
 		int cl = (*assignments)[i];
 		++counts1[cl];
+	}
+	for (int i = 0; i < new_k; ++i)
+	{
+		std::cout << i << ": " << counts1[i] << "; " << std::endl;
+	}
+	//#endif
+	centers.destroy();
+	save_data_to_file("./sample_out", block, assignments);
+	
+}
+
+int main1()
+{
+	using namespace dddml;
+	using namespace std;
+	std::random_device rd; 
+	std::mt19937_64 rng(rd());
+	dmlc::data::RowBlockContainer<int> rbc = dmlc::data::libsvmread("./mnist.txt");
+	RowBlock<int> block = rbc.GetBlock();
+	int n = block.size;
+	auto rb = block;
+	int k = 10, p = 1;
+	size_t dim = 784;
+
+	
+	//#if 0
+	auto output = kmeans(block,  k, /*p */ p , /*dim */ dim, rng, 1);
+	std::cout << "-----------------------\n";
+	auto assignments = output.first;
+	auto centers = output.second;
+	//for (auto i : *assignments)
+	//	std::cout << i << std::endl;
+	int counts[k];
+	real_t distances[k];
+	for (int i = 0; i < k; ++i) {counts[i] = 0; distances[i] = 0;}
+
+	for (int i = 0; i < assignments->size(); ++i)
+	{
+		for (int j = 0; j < p; ++j)
+		{
+			int cl = (*assignments)[i][j];
+			++counts[cl];
+		}
+		//distances[cl] += squareDist(block[i], centers[cl], dim);
+	}
+	for (int i = 0; i < k; ++i)
+	{
+		std::cout << i << ": " << counts[i] << "; " << std::endl;
+	}
+	
+	std::cout << "-----------------------\n";
+	real_t lb = 0.5 * n / k , ub = 2 * n / k;
+	std::cout << "Bounds: " << lb << ' ' << ub << std::endl;
+	
+	int new_k = merge_and_split(block, assignments, centers, lb, ub, k, dim, rng);
+	
+	int counts1[new_k];
+	for (int i = 0; i < new_k; ++i) {counts1[i] = 0; }
+
+	for (int i = 0; i < assignments->size(); ++i)
+	{
+		for (int j = 0; j < p; ++j)
+		{
+			int cl = (*assignments)[i][j];
+			++counts1[cl];
+		}
 	}
 	for (int i = 0; i < new_k; ++i)
 	{

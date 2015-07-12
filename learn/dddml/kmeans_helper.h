@@ -294,6 +294,7 @@ int find_closest(centers_t &all_centers, int center)
 	return min_index;
 }
 
+// returns p nearest centers from nearest to farthest
 template<typename I>
 int *find_p_closest(int p, const Row<I> &row,  centers_t &centers)
 {
