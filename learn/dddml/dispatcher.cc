@@ -10,7 +10,7 @@
 #include "kmeans_helper.h"
 #include "RPTS.h"
 
-#include "dispatcher_config.pb.h"
+#include "dddml_config.pb.h"
 
 using namespace std;
 using namespace dmlc;
@@ -26,15 +26,15 @@ int WorkerNodeMain(int argc, char* argv[]) {
   ArgParser parser;
   if (argc > 1 && strcmp(argv[1], "none")) parser.ReadFile(argv[1]);
   parser.ReadArgs(argc - 2, argv + 2);
-  DispatcherConfig conf;
+  dddmlConfig conf;
   parser.ParseToProto(&conf);
 
   // Load the dispatching data and the dispatch tree
-  auto rpt = RandomPartitionTree<FeaID>(conf.dispatch_data().c_str(),
-                                        conf.dispatch_tree().c_str());
+  auto rpt = RandomPartitionTree<FeaID>(conf.sample_filename().c_str(),
+                                        conf.rpt_filename().c_str());
   // Load the cluster assignments for the dispatch data
   vector<vector<int>> assignments;
-  read_assignments(conf.dispatch_clusters().c_str(), &assignments);
+  read_assignments(conf.assignments_filename().c_str(), &assignments);
 
   int parts_per_worker = conf.n_parts_per_file() / RankSize();
   int extra_parts = conf.n_parts_per_file() - RankSize() * parts_per_worker;
@@ -50,12 +50,15 @@ int WorkerNodeMain(int argc, char* argv[]) {
 
   for (int file_num = 0; file_num < conf.n_files(); ++file_num) {
     stringstream filename;
-    filename << conf.input_data() << file_num;
+    filename << conf.data_directory() << file_num;
+    auto filename_str = filename.str();
     for (size_t part = first_part; part < first_part + num_parts; ++part) {
-      MinibatchIter<FeaID> reader(filename.str().c_str(), part,
-                                  static_cast<size_t>(conf.n_parts_per_file()),
-                                  conf.input_format().c_str(),
-                                  static_cast<size_t>(conf.mb_size()));
+      MinibatchIter<FeaID> reader(
+          filename_str.c_str(), part,
+          static_cast<size_t>(conf.n_parts_per_file()),
+          conf.data_format().c_str(),
+          static_cast<size_t>(conf.dispatch_minibatch_size()));
+
       reader.BeforeFirst();
       while (reader.Next()) {
         auto mb = reader.Value();
@@ -64,7 +67,7 @@ int WorkerNodeMain(int argc, char* argv[]) {
           // TODO: Actually write output to appropriate files
           vector<int>& clusters = assignments[nn_idx];
           cout << "[";
-          for (size_t j  = 0; j < clusters.size(); ++j) {
+          for (size_t j = 0; j < clusters.size(); ++j) {
             cout << clusters[j] << " ";
           }
           cout << "]\n";

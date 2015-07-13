@@ -30,12 +30,11 @@ build/datasplit: build/dddml_config.pb.o build/datasplit.o  ../base/base.a   $(P
 
 build/trial: build/trial.o  ../base/base.a   $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
-	
 
-build/dispatcher: build/dispatcher.o build/dispatcher_config.pb.o ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
+build/dispatcher: build/dispatcher.o build/dddml_config.pb.o ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
-	
-build/analyze_criteo: build/analyze_criteo.pb.o build/analyze_criteo.o ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
+
+build/analyze_criteo: build/dddml_config.pb.o build/analyze_criteo.o ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 

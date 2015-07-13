@@ -1,4 +1,5 @@
 #include <sstream>
+#include <random>
 
 #include "dmlc/data.h"
 #include "data/row_block.h"
@@ -8,7 +9,7 @@
 #include "../base/minibatch_iter.h"
 #include "ps.h"
 
-#include "analyze_criteo.pb.h"
+#include "dddml_config.pb.h"
 
 using namespace std;
 using namespace dmlc;
@@ -65,12 +66,12 @@ int main(int argc, char *argv[])
   ArgParser parser;
   if (argc > 1 && strcmp(argv[1], "none")) parser.ReadFile(argv[1]);
   parser.ReadArgs(argc - 2, argv + 2);
-  DispatcherConfig conf;
+  dddmlConfig conf;
   parser.ParseToProto(&conf);
 
   std::random_device rd;
-	std::mt19937_64 rng (rd());	  
-  
+	std::mt19937_64 rng (rd());
+
   // Steps:
   // 1. Read the dispatch data, cluster assignment, and tree
   // 2. Use MyRank() and RankSize() to decide what parts of the file to read
@@ -78,42 +79,37 @@ int main(int argc, char *argv[])
 
   int nFiles = conf.n_files(),
 		nPartPerFile = conf.n_parts_per_file(),
-		nPartToRead = conf.n_part_to_read(),
-		mb_size = conf.mb_size(),
+		nPartToRead = conf.n_parts_to_read(),
+		mb_size = conf.analysis_minibatch_size(),
 		n_features = conf.n_features_to_pick(),
 		partID;
-	stringstream filename, format, featurefilename;
-  filename << conf.input_data();
-  format << conf.input_format();
-  featurefilename << conf.feature_file_name();
-  auto fn = filename.str();
-  auto fm = format.str();
-  auto feature_filename = featurefilename.str();
-	const char *data_directory = fn.c_str();
-  const char *data_format = fm.c_str();
+  auto data_directory = conf.data_directory();
+  auto data_format = conf.data_format();
+  auto feature_filename = conf.feature_filename();
 
   std::unordered_map<FeaID, size_t> counts;
 
 	std::uniform_int_distribution<int> dis(0, nPartPerFile - 1);
-	
-	real_t probability_of_selecting_one_row = (static_cast<real_t> (nPartToRead) / nPartPerFile); 
+
+	real_t probability_of_selecting_one_row = (static_cast<real_t> (nPartToRead) / nPartPerFile);
 	std::cerr << "Probability of selecting a row: " << probability_of_selecting_one_row << std::endl;
 	probability_of_selecting_one_row = (probability_of_selecting_one_row > 1.0) ? 1.0 : probability_of_selecting_one_row;
-		
+
 	dmlc::data::RowBlockContainer<FeaID> sample;
 	dmlc::data::RowBlockContainer<FeaID> *sample_compressed = new dmlc::data::RowBlockContainer<FeaID>();
-	
+
 	for (int fi = 0; fi < nFiles; ++fi)
 	{
 		for (int part = 0; part < nPartToRead; ++part)
 		{
 			partID = dis(rng);
 			//TODO: verify filename
-			char filename1[200];
-			std::sprintf(filename1, "%s", data_directory); //file nameing convention
+      stringstream filename;
+      filename << data_directory << fi;
+      auto filename_str = filename.str();
 			MinibatchIter<FeaID> reader(
-				filename1, partID, nPartPerFile,
-				data_format, mb_size);
+				filename_str.c_str(), partID, nPartPerFile,
+				data_format.c_str(), mb_size);
 			reader.BeforeFirst();
 			while (reader.Next()) {
 				auto mb = reader.Value(); //row block
@@ -127,13 +123,13 @@ int main(int argc, char *argv[])
 	          counts[uidx[i]] += freq[i];
 	        }
 	        else{ //element does not exist
-	          counts[uidx[i]] = freq[i]; 
+	          counts[uidx[i]] = freq[i];
 	        }
 	      }
 			}
 		}
 	}
-	
+
 	/*
 	for (auto it: counts)
 	{
@@ -143,7 +139,3 @@ int main(int argc, char *argv[])
 	output(counts, n_features, feature_filename);
 
 }
-
-
-
-  

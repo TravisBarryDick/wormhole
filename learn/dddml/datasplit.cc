@@ -22,7 +22,7 @@ using namespace dmlc::data;
 
 /*
 *	Sub-sample data
-*	
+*
 	TO-DO: 1. get args from conf file
 */
 
@@ -78,13 +78,13 @@ void subsample(
 	unsigned int total_size,
 	std::mt19937_64 &rng,
 	int nFiles,
-	int nPartPerFile, 
+	int nPartPerFile,
 	int nPartToRead,
 	int mb_size
 )
 {
 using real_t = dmlc::real_t;
-	
+
 	/* Step 1: Figure out number of files */
 	int /*nFiles = 1,
 		nPartPerFile = 100,
@@ -94,18 +94,18 @@ using real_t = dmlc::real_t;
 
 	std::uniform_real_distribution<> dist(0, 1);
 	std::uniform_int_distribution<int> dis(0, nPartPerFile - 1);
-	
+
 	real_t probability_of_selecting_one_row = (static_cast<real_t> (subsample_size)) / total_size * nPartPerFile / nPartToRead; //TODO: Check.
 	std::cerr << "Probability of selecting a row: " << probability_of_selecting_one_row << std::endl;
 	probability_of_selecting_one_row = (probability_of_selecting_one_row > 1.0) ? 1.0 : probability_of_selecting_one_row;
-		
+
 	/* Step 2: Read some of the blocks at random, and sub-sample */
-	
+
 	int nread = 0, naccept = 0;
-	
+
 	dmlc::data::RowBlockContainer<FeaID> sample;
 	dmlc::data::RowBlockContainer<FeaID> *sample_compressed = new dmlc::data::RowBlockContainer<FeaID>();
-	
+
 	for (int fi = 0; fi < nFiles; ++fi)
 	{
 		for (int part = 0; part < nPartToRead; ++part)
@@ -130,12 +130,12 @@ using real_t = dmlc::real_t;
 						++naccept;
 						sample.Push(mb[i]);
 					}
-					
+
 				}
 			}
 		}
 	}
-	
+
 	/* Step 3: Localize */
 	dmlc::RowBlock<unsigned> sample1 = sample.GetBlock();
 	/* 3.1: read feature file */
@@ -147,15 +147,15 @@ using real_t = dmlc::real_t;
 	dmlc::Localizer <FeaID> lc;
 	std::vector<FeaID> *uidx = new std::vector<FeaID>();
 	lc.CountUniqIndex<FeaID>(sample1, /*4,*/ uidx, NULL); //include nthreads = 4 for older version
-	
+
 	/* 3.3: intersect uidx with features */
 	std::vector<FeaID> *idx_dict = Intersect(features, *uidx);
 	/* 3.4: localize */
 	lc.RemapIndex(sample1, *idx_dict, sample_compressed);
-	
-	
+
+
 	/* Step 4: Write to file */
-	
+
 	//First write idx_dict. Then write compressed sample.
 
 	dmlc::Stream *output = dmlc::Stream::Create(outputFile, "w");
@@ -180,13 +180,13 @@ int main(int argc, char *argv[])
 {
 	using namespace dddml;
 	std::random_device rd;
-	std::mt19937_64 rng (rd());	
+	std::mt19937_64 rng (rd());
 	ArgParser parser;
 	if (argc > 1 && strcmp(argv[1], "none")) parser.ReadFile(argv[1]);
 	parser.ReadArgs(argc - 2, argv + 2);
 	dddmlConfig conf;
 	parser.ParseToProto(&conf);
-	
+
 	#if 0
 	char featureFile[] = "features.txt";
 	char data_directory[] = "../data/mnist";
@@ -194,8 +194,8 @@ int main(int argc, char *argv[])
 	char data_format[] = "libsvm";
 	int subsample_size = 10000;
 	int total_size = 60000;
-	#endif 
-	
+	#endif
+
 	const char *featureFile = conf.feature_filename().c_str();
 	const char *data_directory = conf.data_directory().c_str();
 	const char *outputFile = conf.sample_filename().c_str();
@@ -203,29 +203,13 @@ int main(int argc, char *argv[])
 	int subsample_size = conf.sample_size();
 	int total_size = conf.total_size_of_dataset();
 	//std::cout << subsample_size << " " << total_size << " " << featureFile << std::endl;
-	
+
 	//int nfile = conf.n_files(),
-	
-	
+
+
 	subsample(featureFile, data_directory, outputFile,data_format, subsample_size, total_size, rng,
-			conf.n_files(), conf.n_parts_per_file(), conf.n_parts_to_read(), conf.minibatch_size1());
-	
-	
+			conf.n_files(), conf.n_parts_per_file(), conf.n_parts_to_read(), conf.analysis_minibatch_size());
+
+
 	return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
