@@ -1,6 +1,6 @@
 include ../../make/ps_app.mk
 
-CFLAGS  = -O0 -ggdb -std=c++11 -I./ -I../ $(INCLUDE) $(DMLC_CFLAGS) $(PS_CFLAGS) $(EXTRA_CFLAGS) #-Wall
+CFLAGS  = -O3 -ggdb -std=c++11 -I./ -I../ $(INCLUDE) $(DMLC_CFLAGS) $(PS_CFLAGS) $(EXTRA_CFLAGS) #-Wall
 LDFLAGS = $(CORE_PATH)/libdmlc.a $(DMLC_LDFLAGS) $(PS_LDFLAGS) $(EXTRA_LDFLAGS)
 
 all: base core bin ps # tool # test
@@ -25,7 +25,7 @@ build/%.o: %.cc
 %.pb.cc %.pb.h : %.proto
 	${DEPS_PATH}/bin/protoc --cpp_out=. --proto_path=. $<
 
-build/datasplit: build/datasplit.o  ../base/base.a   $(PS_PATH)/build/libps.a
+build/datasplit: build/dddml_config.pb.o build/datasplit.o  ../base/base.a   $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 build/trial: build/trial.o  ../base/base.a   $(PS_PATH)/build/libps.a
@@ -39,7 +39,7 @@ build/analyze_criteo: build/analyze_criteo.pb.o build/analyze_criteo.o ../base/b
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 
-build/kmeans: build/kmeans.o  ../base/base.a   $(PS_PATH)/build/libps.a
+build/kmeans: build/dddml_config.pb.o build/kmeans.o  ../base/base.a   $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 -include build/*.d

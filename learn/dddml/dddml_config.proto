@@ -1,0 +1,36 @@
+package dddml;
+
+
+message dddmlConfig {
+	optional string data_directory = 1; // initial input data
+	optional string final_output_directory = 2; // after dispatch
+	optional string working_directory = 3; //save temps
+	optional int32 n_files = 4;
+	optional int32 n_parts_per_file = 5;
+	optional string data_format = 6;
+	
+	optional string sample_filename = 14; // name of file with sample.
+	
+	
+	///************************************
+	
+	optional int32 n_parts_to_read = 101; 
+	optional int32 minibatch_size1 = 102;
+	optional string feature_filename = 103;
+	optional int64 total_size_of_dataset = 105; 
+	optional int64 sample_size = 106; // size of sample 
+	
+	//**************************************
+	
+	optional int32 n_clusters = 201;
+	optional int32 replication_factor = 202;
+	optional float cluster_lower_bound = 203;
+	optional float cluster_upper_bound = 204;
+	optional string assignments_filename = 205;  //name of file with assignments
+	optional int32 n_0 = 206; // param of RPT
+	optional string rpt_filename = 207;
+	optional int32 minibatch_size2 = 208; // size of mini-batches for dispatch
+	
+	
+}
+

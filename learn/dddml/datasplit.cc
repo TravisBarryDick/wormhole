@@ -5,13 +5,15 @@
 #include "../base/localizer.h"
 #include "../base/minibatch_iter.h"
 #include "ps.h"
-
+#include "base/arg_parser.h"
 #include <iostream>
 #include <cstring>
 #include <algorithm>
 #include <random>
 #include <vector>
 #include "sample_helper.h"
+
+#include "dddml_config.pb.h"
 
 namespace dddml{
 using FeaID = unsigned;
@@ -24,18 +26,6 @@ using namespace dmlc::data;
 	TO-DO: 1. get args from conf file
 */
 
-#if 0
-template <typename I>
-void print(const dmlc::Row<I> &row)
-{
-	using namespace std;
-	for (size_t i = 0; i < row.length; ++i)
-	{
-		cout << row.index[i] << ':' << row.value[i] << ' ';
-	}
-	cout << endl;
-}
-#endif
 
 void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 {
@@ -86,16 +76,20 @@ void subsample(
 	const char *data_format,
 	unsigned int subsample_size,
 	unsigned int total_size,
-	std::mt19937_64 &rng 	
+	std::mt19937_64 &rng,
+	int nFiles,
+	int nPartPerFile, 
+	int nPartToRead,
+	int mb_size
 )
 {
 using real_t = dmlc::real_t;
 	
 	/* Step 1: Figure out number of files */
-	int nFiles = 1,
+	int /*nFiles = 1,
 		nPartPerFile = 100,
 		nPartToRead = 10,
-		mb_size = 1000,
+		mb_size = 1000,*/
 		partID;
 
 	std::uniform_real_distribution<> dist(0, 1);
@@ -119,7 +113,8 @@ using real_t = dmlc::real_t;
 			partID = dis(rng);
 			//TODO: verify filename
 			char filename[200];
-			std::sprintf(filename, "%s/%d", data_directory, fi);
+			//std::sprintf(filename, "%s/%d", data_directory, fi);
+			std::sprintf(filename, "%s", data_directory);
 			MinibatchIter<FeaID> reader(
 				filename, partID, nPartPerFile,
 				data_format, mb_size);
@@ -186,14 +181,34 @@ int main(int argc, char *argv[])
 	using namespace dddml;
 	std::random_device rd;
 	std::mt19937_64 rng (rd());	
+	ArgParser parser;
+	if (argc > 1 && strcmp(argv[1], "none")) parser.ReadFile(argv[1]);
+	parser.ReadArgs(argc - 2, argv + 2);
+	dddmlConfig conf;
+	parser.ParseToProto(&conf);
+	
+	#if 0
 	char featureFile[] = "features.txt";
 	char data_directory[] = "../data/mnist";
 	char outputFile[] = "../data/mnist.out";
 	char data_format[] = "libsvm";
 	int subsample_size = 10000;
 	int total_size = 60000;
-
-	subsample(featureFile, data_directory, outputFile,data_format, subsample_size, total_size, rng);
+	#endif 
+	
+	const char *featureFile = conf.feature_filename().c_str();
+	const char *data_directory = conf.data_directory().c_str();
+	const char *outputFile = conf.sample_filename().c_str();
+	const char *data_format = conf.data_format().c_str();
+	int subsample_size = conf.sample_size();
+	int total_size = conf.total_size_of_dataset();
+	//std::cout << subsample_size << " " << total_size << " " << featureFile << std::endl;
+	
+	//int nfile = conf.n_files(),
+	
+	
+	subsample(featureFile, data_directory, outputFile,data_format, subsample_size, total_size, rng,
+			conf.n_files(), conf.n_parts_per_file(), conf.n_parts_to_read(), conf.minibatch_size1());
 	
 	
 	return 0;

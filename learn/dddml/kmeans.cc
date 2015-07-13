@@ -16,7 +16,7 @@
 #include <dmlc/io.h>
 #include "data/row_block.h"
 #include <dmlc/timer.h>
-
+#include "dddml_config.pb.h"
 #include "base/arg_parser.h"
 #include "ps.h"
 
@@ -471,7 +471,7 @@ std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int 
 }
 
 
-#if ~DISTRIBUTED
+#if !DISTRIBUTED
 template<typename I>
 void save_data_to_file(const char * filename, const RowBlock<I> &data, vector_int_ptr assignments, Stream *fo = NULL)
 {
@@ -761,7 +761,7 @@ int main(int argc, char *argv[])
 	ArgParser parser;
 	if (argc > 1 && strcmp(argv[1], "none")) parser.ReadFile(argv[1]);
 	parser.ReadArgs(argc - 2, argv + 2);
-	DispatcherConfig conf;
+	dddml::dddmlConfig conf;
 	parser.ParseToProto(&conf);
 	
 	
@@ -782,11 +782,7 @@ int main(int argc, char *argv[])
 		p = conf.replication_factor();
 	real_t lfrac = conf.cluster_lower_bound(),
 		Lfrac = conf.cluster_upper_bound();
-	stringstream data_file_stram, out_file_stream;
-	data_file_stream << conf.data_file();
-	out_file_stream << conf.assignments_file();
-	std::string data_file_ data_file_stream.str(), out_file_ = out_file_stream.str();
-	const char *data_file = data_file_.c_str(), *out_file = out_file_.c_str();
+	const char *data_file = conf.sample_filename().c_str(), *out_file = conf.assignments_filename().c_str();
 	
 	auto readpair = readSamplingOutput(data_file);
 	auto idx_dict = readpair.first;
@@ -798,7 +794,7 @@ int main(int argc, char *argv[])
 	real_t lb = lfrac * n / k,
 			ub = Lfrac * n / k;
 	
-	auto output = kmeans(block,  k, p , dim, rng, 0);
+	auto output = kmeans(data,  k, p , dim, rng, 0);
 	auto assignments = output.first;
 	auto centers = output.second;
 	
@@ -822,7 +818,7 @@ int main(int argc, char *argv[])
 	
 	
 	//heuristics
-	int new_k = merge_and_split(block, assignments, centers, lb, ub, k, dim, rng);
+	int new_k = merge_and_split(data, assignments, centers, lb, ub, k, dim, rng);
 	
 	//printing
 	int counts1[new_k];
