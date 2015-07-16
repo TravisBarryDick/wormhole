@@ -49,10 +49,19 @@ int WorkerNodeMain(int argc, char* argv[]) {
   int first_part = MyRank() * parts_per_worker;
   first_part += min(extra_parts, MyRank());
 
+
+  cout << "GOT THIS FAR" << endl;
+
+  // Read the number of clusters
+  int k;
+  ifstream num_clusters(conf.num_clusters_filename().c_str(), ios::in);
+  num_clusters >> k;
+  num_clusters.close();
+
   // Make a BufferedWriter for each cluster
   vector<BufferedWriter<FeaID>> cluster_writers;
-  cluster_writers.reserve(conf.n_clusters());
-  for (size_t i = 0; i < conf.n_clusters(); ++i) {
+  cluster_writers.reserve(k);
+  for (size_t i = 0; i < k; ++i) {
     stringstream filename;
     filename << conf.final_output_directory() << i << "/" << MyRank();
     string filename_str = filename.str();

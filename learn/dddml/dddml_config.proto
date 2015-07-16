@@ -23,6 +23,7 @@ message dddmlConfig {
 
 	//**************************************
 
+	optional string num_clusters_filename = 200;
 	optional int32 n_clusters = 201;
 	optional int32 replication_factor = 202;
 	optional float cluster_lower_bound = 203;

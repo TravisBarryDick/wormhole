@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <sstream>
 
-#if DISTRIBUTED 
+#if DISTRIBUTED
 
 #include <dmlc/data.h>
 #include <dmlc/logging.h>
@@ -57,8 +57,8 @@ template<typename I>
 bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector<int> &assignments)
 {
 	size_t dim = centers.dim; int k = centers.k;
-	size_t n = data.size; 
-	assert(data.size == assignments.size());
+	size_t n = data.size;
+	CHECK(data.size == assignments.size());
 	bool changed = false;
 	int assignment;
 	for (size_t i = 0; i < n; ++i)
@@ -78,8 +78,8 @@ template<typename I>
 bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector<std::vector<int>> &assignments)
 {
 	size_t dim = centers.dim; int k = centers.k;
-	size_t  p = assignments[0].size(), n = data.size; 
-	assert(data.size == assignments.size());
+	size_t  p = assignments[0].size(), n = data.size;
+	CHECK(data.size == assignments.size());
 	bool changed = false;
 	std::vector<int> assignment;
 	for (size_t i = 0; i < n; ++i)
@@ -97,7 +97,7 @@ bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector
 }
 
 /*
-* Update centers step of k-means 
+* Update centers step of k-means
 * /param centers: vector of centers (will be changed)
 * /param data: datapoints that are to be reassigned
 * /param assignments: vector of assignments from 1 to k. It will be modified
@@ -108,7 +108,7 @@ void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vect
 {
 	size_t dim = centers.dim; int k = centers.k;
 	//std::cout << "Updating centers\n";
-	size_t n = data.size; 
+	size_t n = data.size;
 	CHECK(data.size == assignments.size());
 	centers.reset();
 	int counts[k];
@@ -134,9 +134,9 @@ template<typename I>
 void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments)
 {
 	size_t dim = centers.dim; int k = centers.k;
-	size_t p = assignments[0].size(), n = data.size; 
-	assert(data.size == assignments.size());
-	
+	size_t p = assignments[0].size(), n = data.size;
+	CHECK(data.size == assignments.size());
+
 	centers.reset();
 
 	int counts[k];
@@ -162,7 +162,7 @@ void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vect
 }
 
 /*
-* Update a single center: for balancing heuristics 
+* Update a single center: for balancing heuristics
 * /param centers: vector of centers (will be changed)
 * /param data: datapoints that are to be reassigned
 * /param assignments: vector of assignments from 1 to k. It will be modified
@@ -173,17 +173,17 @@ template<typename I>
 void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments, int center_id)
 {
 	size_t dim = centers.dim; int k = centers.k;
-	size_t n = data.size; 
-	assert(data.size == assignments.size());
-	
+	size_t n = data.size;
+	CHECK(data.size == assignments.size());
+
 	reset(centers[center_id], dim);
-	
+
 	int count = 0;
 	// aggregate all points in a cluster
 	for (int i = 0; i < assignments.size(); ++i)
 	{
 		if (assignments[i] == center_id)
-		{ 
+		{
 			add_into(centers[center_id], dim, data[i]);
 			count += (data.weight == NULL) ? 1 : data.weight[i];
 		}
@@ -197,8 +197,8 @@ template<typename I>
 void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments, int center_id)
 {
 	size_t dim = centers.dim; int k = centers.k;
-	size_t p = assignments[0].size(), n = data.size; 
-	assert(data.size == assignments.size());
+	size_t p = assignments[0].size(), n = data.size;
+	CHECK(data.size == assignments.size());
 	reset(centers[center_id], dim);
 	int count = 0;
 	// aggregate all points in a cluster
@@ -236,13 +236,13 @@ centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_6
 	return centers;
 }
 
-/* 
+/*
 *	k-means++ initialization (code: 1)
 */
 template<typename I>
 centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng)
 {
-	real_t weight; 
+	real_t weight;
 	centers_t centers(dim, k);
 
 	size_t numData = data.size;
@@ -250,7 +250,7 @@ centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 
 	for (int i = 0; i < numData; ++i) sqdists[i] = 0;
 	// initialize first center
 	std::uniform_int_distribution<> dis(0, numData-1);
-	
+
 	add_into(centers[0], dim, data[dis(rng)]);
 
 	//initialize distances
@@ -273,7 +273,7 @@ centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 
 			sqdists[j] = std::min(sqdists[j], squareDist(data[j], centers[i], dim));
 		}
 	}
-	return centers;	
+	return centers;
 }
 
 template<typename I>
@@ -307,7 +307,7 @@ real_t kmeans_objective(const RowBlock<I> &data, vector_vector_int_ptr assignmen
 	for (int i = 0; i < n; ++i)
 	{
 		for (int j = 0; j < p; ++j)
-		{	
+		{
 			if ((*assignments)[i][j] != -1)
 			{
 				++count;
@@ -328,26 +328,26 @@ template<typename I>
 std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng, int init )
 {
 	double start, time;
-	
+
 	#if DISTRIBUTED
 	LOG(INFO) << "Starting k-means";
 	#else
 	std::cout << "Starting k-means" << std::endl;
 	#endif
 	#if DISTRIBUTED
-	LOG(INFO) << "Initializing centers.."; 
+	LOG(INFO) << "Initializing centers..";
 	#else
 	std::cout << "Initializing centers.." << std::endl;
 	#endif
 
 	centers_t centers(dim, k);
 	start = GetTime();
-	if (init == 0) 
+	if (init == 0)
 		centers = random_init(data, k, dim, rng);
 	else //kmpp
 		centers = kmpp_init(data, k, dim, rng);
 	time = GetTime() - start;
-	
+
 
 	#if DISTRIBUTED
 	LOG(INFO) << "Initialization done in " << time << " sec";
@@ -371,8 +371,8 @@ std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size
 		double start1 = GetTime();
 		changed = update_assignments(centers, data, *assignments);//, dim, k);
 		//std::cout << "\tupdate Assignment: " << GetTime() - start1 << std::endl;
-		
-		int counts[k] ; 
+
+		int counts[k] ;
 		for (int i = 0; i < k; ++i) counts[i] = 0;
 		for (int i = 0; i < assignments->size(); ++i)
 		{
@@ -381,7 +381,7 @@ std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size
 		std::cout << '\t';
 		for (int i = 0; i < k; ++i) std::cout << counts[i] << ' ';
 		std::cout << std::endl;
-		
+
 		start1 = GetTime();
 		update_centers(centers, data, *assignments);
 		//std::cout << "\tupdate centers: " << GetTime() - start1 << std::endl;
@@ -403,21 +403,21 @@ template<typename I>
 std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, std::mt19937_64 &rng, int init)
 {
 	double start, time;
-	
+
 	#if DISTRIBUTED
 	LOG(INFO) << "Starting k-means";
 	#else
 	std::cout << "Starting k-means" << std::endl;
 	#endif
 	#if DISTRIBUTED
-	LOG(INFO) << "Initializing centers.."; 
+	LOG(INFO) << "Initializing centers..";
 	#else
 	std::cout << "Initializing centers.." << std::endl;
 	#endif
 
 	centers_t centers(dim, k);
 	start = GetTime();
-	if (init == 0) 
+	if (init == 0)
 		centers = random_init(data, k, dim, rng);
 	else //kmpp
 		centers = kmpp_init(data, k, dim, rng);
@@ -443,8 +443,8 @@ std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int 
 	while(changed)
 	{
 		changed = update_assignments(centers, data, *assignments);
-		
-		int counts[k] ; 
+
+		int counts[k] ;
 		for (int i = 0; i < k; ++i) counts[i] = 0;
 		for (int i = 0; i < assignments->size(); ++i)
 		{
@@ -454,7 +454,7 @@ std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int 
 		std::cout << '\t';
 		for (int i = 0; i < k; ++i) std::cout << counts[i] << ' ';
 		std::cout << std::endl;
-		
+
 		update_centers(centers, data, *assignments);
 		++iter_count;
 		std::cout << iter_count << ": objective: " << kmeans_objective(data, assignments, centers) << std::endl;
@@ -494,7 +494,7 @@ void save_centers_to_file(Stream *fo, centers_t &centers)
 
 /*
 *	MERGE AND SPLIT HEURISTICS:
-*	 Heuristics to merge clusters that are too small and split clusters that are too big 
+*	 Heuristics to merge clusters that are too small and split clusters that are too big
 *
 */
 
@@ -512,7 +512,7 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 	int current_k = k;
 	real_t current_lower = lower_bound,
 			current_upper = upper_bound;
-	int counts[k] ; 
+	int counts[k] ;
 	for (int i = 0; i < k; ++i) counts[i] = 0;
 	int nmerge = 0,  nsplit = 0;
 	for (int i = 0; i < assignments->size(); ++i)
@@ -547,15 +547,15 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 	}
 	//modify upper bound (it gets looser) and leave lower bound intact
 	current_upper *= k / current_k;
-	
-	
-	
+
+
+
 	//split
 	for (int i = 0; i < k; ++i) permutation[i] = i;
 	std::shuffle(permutation.begin(), permutation.end(), rng);
 	int current_index = k; //starting index for new clusters formed
 	for (int i: permutation)
-	{ 
+	{
 		if (counts[i] >= 0 && counts[i] > current_upper)
 		{
 			//cluster too big. Need to split.
@@ -578,10 +578,10 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 			/*
 			if we split into t clusters, t-1 new clusters are formed
 			*/
-			current_k += (num_new_clusters_for_this_cluster - 1);	
+			current_k += (num_new_clusters_for_this_cluster - 1);
 		}
 	}
-	
+
 	//pre-clean-up
 	int counts1[current_index];
 	for (int i = 0; i < current_index; ++i) {counts1[i] = 0; }
@@ -592,8 +592,8 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 		++counts1[cl];
 	}
 	for (int i = 0; i < current_index; ++i) {std::cout << i << ": " << counts1[i] << std::endl; }
-	
-	
+
+
 	//clean-up
 	//re-map indices >=current_k to deleted indices
 	for (int j = 0; j < assignments->size(); ++j)
@@ -617,7 +617,7 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 	int current_k = k, p = (*assignments)[0].size();
 	real_t current_lower = lower_bound,
 			current_upper = upper_bound;
-	int counts[k] ; 
+	int counts[k] ;
 	for (int i = 0; i < k; ++i) counts[i] = 0;
 	int nmerge = 0,  nsplit = 0;
 	for (int i = 0; i < assignments->size(); ++i)
@@ -654,15 +654,15 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 	}
 	//modify upper bound (it gets looser) and leave lower bound intact
 	current_upper *= k / current_k;
-	
-	
-	
+
+
+
 	//split
 	for (int i = 0; i < k; ++i) permutation[i] = i;
 	std::shuffle(permutation.begin(), permutation.end(), rng);
 	int current_index = k; //starting index for new clusters formed
 	for (int i: permutation)
-	{ 
+	{
 		if (counts[i] >= 0 && counts[i] > current_upper)
 		{
 			//cluster too big. Need to split.
@@ -688,16 +688,16 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 			/*
 			if we split into t clusters, t-1 new clusters are formed
 			*/
-			current_k += (num_new_clusters_for_this_cluster - 1);	
+			current_k += (num_new_clusters_for_this_cluster - 1);
 		}
 	}
-	
+
 	//pre-clean-up
 	int counts1[current_index];
 	for (int i = 0; i < current_index; ++i) {counts1[i] = 0; }
 
 	for (int i = 0; i < assignments->size(); ++i)
-	{	
+	{
 		for (int j = 0; j < p; ++j)
 		{
 			int cl = (*assignments)[i][j];
@@ -705,8 +705,8 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 		}
 	}
 	for (int i = 0; i < current_index; ++i) {std::cout << i << ": " << counts1[i] << std::endl; }
-	
-	
+
+
 	//clean-up
 	//re-map indices >=current_k to deleted indices
 	for (int j = 0; j < assignments->size(); ++j)
@@ -737,10 +737,10 @@ App* App::Create(int argc, char *argv[]) {
 }  // namespace ps
 
 
-using FeaID = unsigned;
+using FeaID = unsigned long long;
 using myPair = std::pair<std::vector<FeaID>*, dmlc::data::RowBlockContainer<FeaID>*>;
 
-myPair readSamplingOutput(const char filename[])
+myPair readSamplingOutput(const char *filename)
 {
 	dmlc::Stream *output = dmlc::Stream::Create(filename, "r");
 	std::vector<FeaID> *idx = new std::vector<FeaID>();
@@ -751,8 +751,8 @@ myPair readSamplingOutput(const char filename[])
 	data->Load(output);
 	return myPair(idx, data);
 }
-	
-	
+
+
 int main(int argc, char *argv[])
 {
 	using namespace dddml;
@@ -763,11 +763,11 @@ int main(int argc, char *argv[])
 	parser.ReadArgs(argc - 2, argv + 2);
 	dddml::dddmlConfig conf;
 	parser.ParseToProto(&conf);
-	
-	
-	std::random_device rd; 
+
+
+	std::random_device rd;
 	std::mt19937_64 rng(rd());
-	
+
 	/*
 		Parameters:
 			- n_clusters: K: number of clusters
@@ -777,27 +777,27 @@ int main(int argc, char *argv[])
 			- data_file: file with idx_map and localized row block
 			- assignments_file: file to write assignments to
 	*/
-	
+
 	int k = conf.n_clusters(),
 		p = conf.replication_factor();
 	real_t lfrac = conf.cluster_lower_bound(),
 		Lfrac = conf.cluster_upper_bound();
 	const char *data_file = conf.sample_filename().c_str(), *out_file = conf.assignments_filename().c_str();
-	
+
 	auto readpair = readSamplingOutput(data_file);
 	auto idx_dict = readpair.first;
 	int dim = idx_dict->size(); // dim = size of idx_dict
 	dmlc::data::RowBlockContainer<FeaID>* data_rbc = readpair.second;  // pointer to row block container with data
 	auto data = data_rbc->GetBlock();
 	int n = data.size;
-	
+
 	real_t lb = lfrac * n / k,
 			ub = Lfrac * n / k;
-	
+
 	auto output = kmeans(data,  k, p , dim, rng, 0);
 	auto assignments = output.first;
 	auto centers = output.second;
-	
+
 	//printing
 	int counts[k];
 	for (int i = 0; i < k; ++i) {counts[i] = 0;}
@@ -815,11 +815,11 @@ int main(int argc, char *argv[])
 		std::cout << i << ": " << counts[i] << "; " << std::endl;
 	}
 	std::cout << "-----------------------\n";
-	
-	
+
+
 	//heuristics
 	int new_k = merge_and_split(data, assignments, centers, lb, ub, k, dim, rng);
-	
+
 	//printing
 	int counts1[new_k];
 	for (int i = 0; i < new_k; ++i) {counts1[i] = 0; }
@@ -837,6 +837,12 @@ int main(int argc, char *argv[])
 		std::cout << i << ": " << counts1[i] << "; " << std::endl;
 	}
 	centers.destroy();
+
+	std::ofstream num_clusters(conf.num_clusters_filename().c_str(), std::ios::out);
+	num_clusters << new_k << std::endl;
+	num_clusters.close();
+
+	save_assignments(out_file, &(*assignments));
 }
 
 #else
@@ -845,7 +851,7 @@ int main()
 {
 	using namespace dddml;
 	using namespace std;
-	std::random_device rd; 
+	std::random_device rd;
 	std::mt19937_64 rng(rd());
 	dmlc::data::RowBlockContainer<int> rbc = dmlc::data::libsvmread("./mnist.txt");
 	RowBlock<int> block = rbc.GetBlock();
@@ -854,7 +860,7 @@ int main()
 	int k = 10;
 	size_t dim = 784;
 
-	
+
 	//#if 0
 	auto output = kmeans(block,  k, /*p */ /*dim */ dim, rng, 1);
 	std::cout << "-----------------------\n";
@@ -876,13 +882,13 @@ int main()
 	{
 		std::cout << i << ": " << counts[i] << "; " << std::endl;
 	}
-	
+
 	std::cout << "-----------------------\n";
 	real_t lb = 0.5 * n / k , ub = 2 * n / k;
 	std::cout << "Bounds: " << lb << ' ' << ub << std::endl;
-	
+
 	int new_k = merge_and_split(block, assignments, centers, lb, ub, k, dim, rng);
-	
+
 	int counts1[new_k];
 	for (int i = 0; i < new_k; ++i) {counts1[i] = 0; }
 
@@ -898,14 +904,14 @@ int main()
 	//#endif
 	centers.destroy();
 	save_data_to_file("./sample_out", block, assignments);
-	
+
 }
 
 int main1()
 {
 	using namespace dddml;
 	using namespace std;
-	std::random_device rd; 
+	std::random_device rd;
 	std::mt19937_64 rng(rd());
 	dmlc::data::RowBlockContainer<int> rbc = dmlc::data::libsvmread("./mnist.txt");
 	RowBlock<int> block = rbc.GetBlock();
@@ -914,7 +920,7 @@ int main1()
 	int k = 10, p = 1;
 	size_t dim = 784;
 
-	
+
 	//#if 0
 	auto output = kmeans(block,  k, /*p */ p , /*dim */ dim, rng, 1);
 	std::cout << "-----------------------\n";
@@ -939,13 +945,13 @@ int main1()
 	{
 		std::cout << i << ": " << counts[i] << "; " << std::endl;
 	}
-	
+
 	std::cout << "-----------------------\n";
 	real_t lb = 0.5 * n / k , ub = 2 * n / k;
 	std::cout << "Bounds: " << lb << ' ' << ub << std::endl;
-	
+
 	int new_k = merge_and_split(block, assignments, centers, lb, ub, k, dim, rng);
-	
+
 	int counts1[new_k];
 	for (int i = 0; i < new_k; ++i) {counts1[i] = 0; }
 
@@ -964,7 +970,7 @@ int main1()
 	//#endif
 	centers.destroy();
 	save_data_to_file("./sample_out", block, assignments);
-	
+
 }
 
 
