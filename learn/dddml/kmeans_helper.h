@@ -11,10 +11,10 @@
 
 #include "local/io.h"
 #include "local/data.h"
-#include <iostream>
 
 #endif
 
+#include <iostream>
 #include <string>
 #include <cstring>
 #include <random>

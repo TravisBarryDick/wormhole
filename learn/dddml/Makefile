@@ -9,7 +9,7 @@ clean:
 	rm -rf build/*
 
 
-bin: build/datasplit build/analyze_criteo build/kmeans build/dispatch
+bin: build/datasplit build/analyze_criteo build/kmeans build/dispatcher
 
 #build/%.o: %.cc
 #	@mkdir -p $(@D)
