@@ -9,6 +9,7 @@
 #include "ps.h"
 #include "kmeans_helper.h"
 #include "RPTS.h"
+#include "BufferedWriter.h"
 
 #include "dddml_config.pb.h"
 
@@ -18,7 +19,7 @@ using namespace dmlc::data;
 using namespace ps;
 using namespace dddml;
 
-typedef unsigned FeaID;
+typedef unsigned long long FeaID;
 
 int CreateServerNode(int argc, char* argv[]) { return 0; }
 
@@ -48,6 +49,16 @@ int WorkerNodeMain(int argc, char* argv[]) {
   int first_part = MyRank() * parts_per_worker;
   first_part += min(extra_parts, MyRank());
 
+  // Make a BufferedWriter for each cluster
+  vector<BufferedWriter<FeaID>> cluster_writers;
+  cluster_writers.reserve(conf.n_clusters());
+  for (size_t i = 0; i < conf.n_clusters(); ++i) {
+    stringstream filename;
+    filename << conf.final_output_directory() << i << "/" << MyRank();
+    string filename_str = filename.str();
+    cluster_writers.push_back(BufferedWriter<FeaID>(filename_str.c_str()));
+  }
+
   for (int file_num = 0; file_num < conf.n_files(); ++file_num) {
     stringstream filename;
     filename << conf.data_directory() << file_num;
@@ -64,13 +75,9 @@ int WorkerNodeMain(int argc, char* argv[]) {
         auto mb = reader.Value();
         for (size_t i = 0; i < mb.size; ++i) {
           size_t nn_idx = rpt.find_nn(mb[i]);
-          // TODO: Actually write output to appropriate files
-          vector<int>& clusters = assignments[nn_idx];
-          cout << "[";
-          for (size_t j = 0; j < clusters.size(); ++j) {
-            cout << clusters[j] << " ";
+          for (auto cluster_ix : assignments[nn_idx]) {
+            cluster_writers[cluster_ix].Write(mb[i]);
           }
-          cout << "]\n";
         }
       }
     }
