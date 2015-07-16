@@ -16,7 +16,7 @@
 #include "dddml_config.pb.h"
 
 namespace dddml{
-using FeaID = unsigned;
+using FeaID = unsigned long long;
 using namespace dmlc;
 using namespace dmlc::data;
 
@@ -137,7 +137,7 @@ using real_t = dmlc::real_t;
 	}
 
 	/* Step 3: Localize */
-	dmlc::RowBlock<unsigned> sample1 = sample.GetBlock();
+	dmlc::RowBlock<unsigned long long> sample1 = sample.GetBlock();
 	/* 3.1: read feature file */
 	int SomeDefaultStartingValue = 10000; //TODO
 	std::vector<FeaID> features;

@@ -11,7 +11,10 @@
 #include "data/libsvm_parser.h"
 #include "base/adfea_parser.h"
 #include "base/criteo_parser.h"
+#include "base/rbcBinary_parser.h"
 #include "base/utils.h"
+
+//#include <iostream>
 namespace dmlc {
 namespace data {
 
@@ -42,10 +45,12 @@ class MinibatchIter {
     } else if (!strcmp(type, "adfea")) {
       parser_ = new AdfeaParser<IndexType>(
           InputSplit::Create(uri, part_index, num_parts, "text"));
+    } else if (!strcmp(type, "RowBlockContainer")) {
+      parser_ = new RowBlockContainerBinaryParser<IndexType> (uri); 
     } else {
       LOG(FATAL) << "unknown datatype " << type;
     }
-	parser_ = new ThreadedParser<IndexType>(parser_);
+  	parser_ = new ThreadedParser<IndexType>(parser_);
   }
 
   virtual ~MinibatchIter() {
@@ -60,7 +65,9 @@ class MinibatchIter {
     mb_.Clear();
     while (mb_.offset.size() < mb_size_ + 1) {
       if (start_ == end_) {
-        if (!parser_->Next()) break;
+        if (!parser_->Next()) {
+          break;
+        }
         in_blk_ = parser_->Value();
         start_ = 0;
         end_ = in_blk_.size;
@@ -102,7 +109,7 @@ class MinibatchIter {
 
   unsigned mb_size_;
   ParserImpl<IndexType> *parser_;
-
+  
   size_t start_, end_;
   RowBlock<IndexType> in_blk_;
   RowBlockContainer<IndexType> mb_;

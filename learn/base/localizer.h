@@ -60,9 +60,10 @@ class Localizer {
    *
    * @param localized a rowblock with index mapped: idx_dict[i] -> i.
    */
+  template<typename J>
   void RemapIndex(const RowBlock<I>& blk,
                   const std::vector<I>& idx_dict,
-                  data::RowBlockContainer<unsigned> *localized);
+                  data::RowBlockContainer<J> *localized);
 
 
   /**
@@ -150,17 +151,18 @@ void Localizer<I>:: CountUniqIndex(
 }
 
 template<typename I>
+template<typename J>
 void Localizer<I>::RemapIndex(
     const RowBlock<I>& blk, const std::vector<I>& idx_dict,
-    data::RowBlockContainer<unsigned> *localized) {
+    data::RowBlockContainer<J> *localized) {
   if (blk.size == 0 || idx_dict.empty()) return;
   CHECK_LT(idx_dict.size(),
-           static_cast<size_t>(std::numeric_limits<unsigned>::max()));
+           static_cast<size_t>(std::numeric_limits<J>::max()));
   CHECK_EQ(blk.offset[blk.size], pair_.size());
 
   // build the index mapping
-  unsigned matched = 0;
-  std::vector<unsigned> remapped_idx(pair_.size(), 0);
+  J matched = 0;
+  std::vector<J> remapped_idx(pair_.size(), 0);
   auto cur_dict = idx_dict.cbegin();
   auto cur_pair = pair_.cbegin();
   while (cur_dict != idx_dict.cend() && cur_pair != pair_.cend()) {
@@ -169,7 +171,7 @@ void Localizer<I>::RemapIndex(
     } else {
       if (*cur_dict == cur_pair->k) {
         remapped_idx[cur_pair->i]
-            = static_cast<unsigned>((cur_dict-idx_dict.cbegin()) + 1);
+            = static_cast<J>((cur_dict-idx_dict.cbegin()) + 1);
         ++ matched;
       }
       ++ cur_pair;
@@ -177,7 +179,7 @@ void Localizer<I>::RemapIndex(
   }
 
   // construct the new rowblock
-  data::RowBlockContainer<unsigned>* o = localized;
+  data::RowBlockContainer<J>* o = localized;
   CHECK_NOTNULL(o);
   o->offset.resize(blk.size+1); o->offset[0] = 0;
   o->index.resize(matched);

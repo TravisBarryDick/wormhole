@@ -9,7 +9,7 @@ clean:
 	rm -rf build/*
 
 
-bin: build/datasplit build/analyze_criteo
+bin: build/datasplit build/analyze_criteo build/kmeans build/dispatch
 
 #build/%.o: %.cc
 #	@mkdir -p $(@D)
@@ -28,10 +28,10 @@ build/%.o: %.cc
 build/datasplit: build/dddml_config.pb.o build/datasplit.o  ../base/base.a   $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
-build/trial: build/trial.o  ../base/base.a   $(PS_PATH)/build/libps.a
+build/trial: build/dddml_config.pb.o build/trial.o  ../base/base.a   $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
-build/dispatcher: build/dispatcher.o build/dddml_config.pb.o ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
+build/dispatcher: build/dddml_config.pb.o build/dispatcher.o  ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 build/analyze_criteo: build/dddml_config.pb.o build/analyze_criteo.o ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
