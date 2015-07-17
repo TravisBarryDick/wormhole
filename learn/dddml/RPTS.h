@@ -48,16 +48,16 @@ public:
   /* Determines which direction a given row should be routed by this
    * split */
   RouteDirection route(Row<IndexType> row);
-  
+
   /* Disk IO functions */
   void Save(dmlc::Stream *fo);
   static unique_ptr<RPTSplit> Load(dmlc::Stream *fi, std::vector<IndexType> *feature_dict_ptr);
-  
+
 private:
   vector<real_t> d; // The direction for the split
   real_t t;         // The split point
   vector<IndexType> *feature_dict_ptr; // feature map
-  
+
   real_t SparseDot(Row<IndexType> row);
 };
 
@@ -79,7 +79,7 @@ real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
 			++j;
 		}
 		else
-		{			
+		{
 			++i;
 		}
 	}
@@ -158,11 +158,11 @@ public:
 
   /* Returns the row indices in the same leaf as row. */
   auto search(Row<IndexType> row) -> const vector<size_t> *;
-  
+
   /* Disk IO functions */
   void Save(dmlc::Stream *fo);
   static unique_ptr<RPTNode<IndexType>> Load(dmlc::Stream *fi, std::vector<IndexType> *feature_dict_ptr);
-  
+
 private:
   unique_ptr<RPTNode<IndexType>> left;
   unique_ptr<RPTNode<IndexType>> right;
@@ -199,13 +199,13 @@ inline void RPTNode<IndexType>::Save(dmlc::Stream *fo)
   //save ifLeaf = 0 for internal nodes, and ifLeaf = 1 for leaves
   bool isLeaf = (idxs.size() > 0);
   fo->Write(&isLeaf, sizeof(bool));
-  
+
   if (!isLeaf) {
     //save children recursively
     left->Save(fo);
     right->Save(fo);
     //only save split for internal nodes
-    split.Save(fo); 
+    split.Save(fo);
   }
   else fo->Write(idxs); //only save idxs for leaves
 }
@@ -215,7 +215,7 @@ unique_ptr<RPTNode<IndexType>> RPTNode<IndexType>::Load(dmlc::Stream *fi, std::v
 {
   bool isLeaf;
   fi->Read(&(isLeaf), sizeof(bool));
-  
+
   if (!isLeaf){
     // read left and right children recursively
     unique_ptr<RPTNode<IndexType>> left = Load(fi, feature_dict_ptr);
@@ -249,7 +249,7 @@ unique_ptr<RPTNode<IndexType>> make_rptree(mt19937_64 &rng, int dimension,
     auto split = RPTSplit<IndexType>(rng, dimension, data, idxs, feature_dict_ptr);
     vector<size_t> left_idxs(0);
     vector<size_t> right_idxs(0);
-    for (IndexType idx : idxs) {
+    for (size_t idx : idxs) {
       if (split.route(data[idx]) == LEFT)
         left_idxs.push_back(idx);
       else
@@ -300,7 +300,7 @@ public:
   auto find_nn(dmlc::Row<IndexType> row) -> size_t;
 
   auto get_rowblock() -> const dmlc::data::RowBlockContainer<IndexType> &;
-  
+
   /* File IO functions */
   void Save(dmlc::Stream*);
   void Save(const char*);
@@ -311,7 +311,7 @@ private:
   std::vector<IndexType> feature_dict;
   dmlc::data::RowBlockContainer<IndexType> data;
   std::unique_ptr<rpt_impl::RPTNode<IndexType>> tree;
-  
+
   inline dmlc::real_t SquareDist(const dmlc::Row<IndexType> &r1, size_t index);
 };
 
@@ -326,7 +326,7 @@ RandomPartitionTree<IndexType>::RandomPartitionTree(
 {
   tree = std::move(rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock(), &(this->feature_dict)));
 }
-      
+
 
 template <typename IndexType>
 RandomPartitionTree<IndexType>::RandomPartitionTree(
@@ -336,7 +336,7 @@ RandomPartitionTree<IndexType>::RandomPartitionTree(
     std::vector<IndexType> &feature_dict)
     : data(data), feature_dict(feature_dict)
 {
-  tree = rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock(), idxs, &(this->feature_dict));      
+  tree = rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock(), idxs, &(this->feature_dict));
 }
 
 template <typename IndexType> size_t RandomPartitionTree<IndexType>::depth() {
@@ -377,7 +377,7 @@ inline dmlc::real_t RandomPartitionTree<IndexType>::SquareDist(const dmlc::Row<I
 }
 
 template <typename IndexType>
-size_t RandomPartitionTree<IndexType>::find_nn(dmlc::Row<IndexType> row) { 
+size_t RandomPartitionTree<IndexType>::find_nn(dmlc::Row<IndexType> row) {
   auto leaf_idxs = tree->search(row);
   dmlc::real_t min_dist = std::numeric_limits<dmlc::real_t>::infinity();
   size_t best_idx;

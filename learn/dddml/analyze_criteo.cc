@@ -17,7 +17,7 @@ using namespace dmlc::data;
 using namespace ps;
 using namespace dddml;
 
-typedef unsigned FeaID;
+typedef unsigned long long FeaID;
 
 namespace ps {
 App* App::Create(int argc, char *argv[]) {

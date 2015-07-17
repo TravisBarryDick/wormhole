@@ -8,6 +8,7 @@ message dddmlConfig {
 	optional int32 n_files = 4;
 	optional int32 n_parts_per_file = 5;
 	optional string data_format = 6;
+	optional int32 dimension = 7; // Dimension of data
 
 	optional string sample_filename = 14; // name of file with sample.
 

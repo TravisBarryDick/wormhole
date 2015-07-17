@@ -38,6 +38,7 @@ void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 	else
 	{
 		file->Read(features);
+		std::cout << "DEBUG: "; for (auto pvix : *features) std::cout << pvix << " "; std::cout << std::endl;
 	}
 	delete file;
 }
@@ -66,7 +67,6 @@ std::vector<FeaID> *Intersect(std::vector<FeaID> &v1, std::vector<FeaID> &v2)
 		}
 	}
 	return output;
-
 }
 
 void subsample(
@@ -137,7 +137,7 @@ using real_t = dmlc::real_t;
 	}
 
 	/* Step 3: Localize */
-	dmlc::RowBlock<unsigned long long> sample1 = sample.GetBlock();
+	dmlc::RowBlock<FeaID> sample1 = sample.GetBlock();
 	/* 3.1: read feature file */
 	int SomeDefaultStartingValue = 10000; //TODO
 	std::vector<FeaID> features;
@@ -148,11 +148,25 @@ using real_t = dmlc::real_t;
 	std::vector<FeaID> *uidx = new std::vector<FeaID>();
 	lc.CountUniqIndex<FeaID>(sample1, /*4,*/ uidx, NULL); //include nthreads = 4 for older version
 
+	std::cout << "DEBUGGING: features.size() = " << features.size()
+						<< " uidx->size() = " << uidx->size() << std::endl;
+
 	/* 3.3: intersect uidx with features */
 	std::vector<FeaID> *idx_dict = Intersect(features, *uidx);
-	/* 3.4: localize */
-	lc.RemapIndex(sample1, *idx_dict, sample_compressed);
 
+	std::cout << "DEBUGGING: ";
+	for (auto i : *idx_dict) std::cout << i << " ";
+	std::cout << std::endl;
+
+	/* 3.4: localize */
+	lc.RemapIndex<FeaID>(sample1, *idx_dict, sample_compressed);
+
+
+	// std::cout << "DEBUG: sample_compressed->Size() = " << sample_compressed->Size() << std::endl;
+	// for (size_t i = 0; i < sample_compressed->Size(); ++i) {
+	// 	std::cout << sample_compressed->GetBlock()[i].length << " ";
+	// }
+	// std::cout << std::endl;
 
 	/* Step 4: Write to file */
 

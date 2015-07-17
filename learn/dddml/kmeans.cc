@@ -8,6 +8,7 @@
 #include <array>
 #include <algorithm>
 #include <sstream>
+#include "RPTS.h"
 
 #if DISTRIBUTED
 
@@ -92,6 +93,7 @@ bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector
 				assignments[i][j] = p_closest[j];
 			}
 		}
+		delete[] p_closest;
 	}
 	return changed;
 }
@@ -791,8 +793,14 @@ int main(int argc, char *argv[])
 	auto data = data_rbc->GetBlock();
 	int n = data.size;
 
-	real_t lb = lfrac * n / k,
-			ub = Lfrac * n / k;
+	real_t lb = lfrac * n * p / k,
+			ub = Lfrac * n * p / k;
+
+	std::cout << "DEBUG: data_rbc->Size() = " << data_rbc->Size() << std::endl;
+	for (size_t i = 0; i < data_rbc->Size(); ++i) {
+		std::cout << data[i].length << " ";
+	}
+	std::cout << std::endl;
 
 	auto output = kmeans(data,  k, p , dim, rng, 0);
 	auto assignments = output.first;
@@ -838,11 +846,17 @@ int main(int argc, char *argv[])
 	}
 	centers.destroy();
 
+	// Save the number of clusters and the assignments file
 	std::ofstream num_clusters(conf.num_clusters_filename().c_str(), std::ios::out);
 	num_clusters << new_k << std::endl;
 	num_clusters.close();
-
 	save_assignments(out_file, &(*assignments));
+
+	// Build a random partition tree on the sample and save it to file
+	RandomPartitionTree<FeaID> rpt(rng, static_cast<int>(conf.dimension()),
+																 static_cast<int>(conf.n_0()), *data_rbc,
+																 *idx_dict);
+	rpt.Save(conf.rpt_filename().c_str());
 }
 
 #else

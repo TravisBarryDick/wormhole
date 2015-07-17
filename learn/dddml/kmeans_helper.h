@@ -185,7 +185,7 @@ template <typename I>
 inline void add_into(real_t *arr, size_t dim, const Row<I> &r1)
 {
 	CHECK(arr != NULL);
-	CHECK(r1.index[r1.length - 1] < dim);
+	CHECK(r1.index[r1.length - 1]	 < dim);
 	for(size_t i = 0; i < r1.length; ++i)
 	{
 		arr[r1.index[i]] += r1.weight * r1.value[i];
