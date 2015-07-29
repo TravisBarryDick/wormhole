@@ -3,6 +3,7 @@
  * @brief  A minibatch iterator
  */
 #pragma once
+#include <algorithm>
 #include <dmlc/logging.h>
 #include <dmlc/io.h>
 #include <cstring>
@@ -11,69 +12,108 @@
 #include "data/libsvm_parser.h"
 #include "base/adfea_parser.h"
 #include "base/criteo_parser.h"
+#include "base/crb_parser.h"
+#include "base/debug.h"
 #include "base/rbcBinary_parser.h"
 #include "base/utils.h"
-
-//#include <iostream>
 namespace dmlc {
 namespace data {
 
 /**
  * \brief Read a fixed size minibatch each time.
- *
- * the current implementation is not efficient due to unnecessary data copy
+ * @param minibatch_size the minibatch size
+ * @param if nonzero, then the minibatch is randomly picked from a buffer with
+ * *shuf_buf* examples
  */
 template<typename IndexType>
 class MinibatchIter {
  public:
   MinibatchIter(const char* uri, unsigned part_index, unsigned num_parts,
-                const char* type, unsigned minibatch_size)
-      : mb_size_(minibatch_size), start_(0), end_(0) {
-    // create parser
-    if (!strcmp(type, "libsvm")) {
-      parser_ = new LibSVMParser<IndexType>(
-          InputSplit::Create(uri, part_index, num_parts, "text"), 1);
-    } else if (!strcmp(type, "criteo_rec")) {
-      parser_ = new CriteoRecParser<IndexType>(
-          InputSplit::Create(uri, part_index, num_parts, "recordio"));
-    } else if (!strcmp(type, "criteo")) {
-      parser_ = new CriteoParser<IndexType>(
-          InputSplit::Create(uri, part_index, num_parts, "text"));
-    } else if (!strcmp(type, "adfea_rec")) {
-      parser_ = new AdfeaRecParser<IndexType>(
-          InputSplit::Create(uri, part_index, num_parts, "recordio"));
-    } else if (!strcmp(type, "adfea")) {
-      parser_ = new AdfeaParser<IndexType>(
-          InputSplit::Create(uri, part_index, num_parts, "text"));
-    } else if (!strcmp(type, "RowBlockContainer")) {
-      parser_ = new RowBlockContainerBinaryParser<IndexType> (uri); 
+                const char* type, unsigned minibatch_size,
+                unsigned shuf_buf = 0,
+                float negative_sampling = 1.0)
+      : mb_size_(minibatch_size), shuf_buf_(shuf_buf),
+        negative_sampling_(negative_sampling), start_(0), end_(0) {
+    if (shuf_buf) {
+      CHECK_GT(shuf_buf, minibatch_size);
+      buf_reader_ =
+          new MinibatchIter(uri, part_index, num_parts, type, shuf_buf, 0);
+      parser_ = NULL;
     } else {
-      LOG(FATAL) << "unknown datatype " << type;
+      // create parser
+      if (!strcmp(type, "libsvm")) {
+        parser_ = new LibSVMParser<IndexType>(
+            InputSplit::Create(uri, part_index, num_parts, "text"), 1);
+      } else if (!strcmp(type, "criteo")) {
+        parser_ = new CriteoParser<IndexType>(
+            InputSplit::Create(uri, part_index, num_parts, "text"), true);
+      } else if (!strcmp(type, "criteo_test")) {
+        parser_ = new CriteoParser<IndexType>(
+            InputSplit::Create(uri, part_index, num_parts, "text"), false);
+      } else if (!strcmp(type, "adfea")) {
+        parser_ = new AdfeaParser<IndexType>(
+            InputSplit::Create(uri, part_index, num_parts, "text"));
+      } else if (!strcmp(type, "RowBlockContainer")) {
+        parser_ = new RowBlockContainerBinaryParser<IndexType> (uri);
+      } else if (!strcmp(type, "crb")) {
+        parser_ = new CRBParser<IndexType>(
+            InputSplit::Create(uri, part_index, num_parts, "recordio"));
+
+      } else {
+        LOG(FATAL) << "unknown datatype " << type;
+      }
+      parser_ = new ThreadedParser<IndexType>(parser_);
+      buf_reader_ = NULL;
     }
-  	parser_ = new ThreadedParser<IndexType>(parser_);
   }
 
   virtual ~MinibatchIter() {
     delete parser_;
+    delete buf_reader_;
   }
 
   void BeforeFirst(void) {
-    parser_->BeforeFirst();
+    if (parser_) parser_->BeforeFirst();
+    if (buf_reader_) buf_reader_->BeforeFirst();
   }
 
   bool Next(void) {
     mb_.Clear();
     while (mb_.offset.size() < mb_size_ + 1) {
       if (start_ == end_) {
-        if (!parser_->Next()) {
-          break;
+        if (shuf_buf_ == 0) {
+          // no random shuffle
+          if (!parser_->Next()) break;
+          in_blk_ = parser_->Value();
+
+        } else {
+          // do random shuffle
+          if (!buf_reader_->Next()) break;
+          in_blk_ = buf_reader_->Value();
+          if (rdp_.size() != in_blk_.size) {
+            rdp_.resize(in_blk_.size);
+            for (size_t i = 0; i < in_blk_.size; ++i) rdp_[i] = i;
+          }
+          std::random_shuffle(rdp_.begin(), rdp_.end());
         }
-        in_blk_ = parser_->Value();
         start_ = 0;
         end_ = in_blk_.size;
       }
+
       size_t len = std::min(end_ - start_, mb_size_ + 1 - mb_.offset.size());
-      Push(start_, len);
+      if (shuf_buf_ == 0) {
+        Push(start_, len);
+      } else {
+        for (size_t i = start_; i < start_ + len; ++i) {
+          int j = rdp_[i];
+          if (negative_sampling_ < 1.0 &&
+              in_blk_.label[j] <= 0 &&
+              (float)rand() / (float)RAND_MAX > 1 - negative_sampling_) {
+              continue;
+          }
+          mb_.Push(in_blk_[j]);
+        }
+      }
       start_ += len;
     }
     out_blk_ = mb_.GetBlock();
@@ -81,7 +121,7 @@ class MinibatchIter {
   }
 
   size_t BytesRead(void) const {
-    return parser_->BytesRead();
+    return parser_ ? parser_->BytesRead() : buf_reader_->BytesRead();
   }
 
   const RowBlock<IndexType> &Value(void) const {
@@ -107,13 +147,21 @@ class MinibatchIter {
     mb_.Push(slice);
   }
 
-  unsigned mb_size_;
+  unsigned mb_size_, shuf_buf_;
   ParserImpl<IndexType> *parser_;
-  
+
+  // sampling negative examples
+  float negative_sampling_;
+
   size_t start_, end_;
   RowBlock<IndexType> in_blk_;
   RowBlockContainer<IndexType> mb_;
   RowBlock<IndexType> out_blk_;
+
+  // random pertubation
+  std::vector<unsigned> rdp_;
+  MinibatchIter<IndexType>* buf_reader_;
+
 };
 
 }  // namespace data

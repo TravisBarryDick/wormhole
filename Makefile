@@ -1,53 +1,107 @@
 # Makefile for wormhole project
 ifneq ("$(wildcard ./config.mk)","")
-	config = config.mk
+	config = $(CURDIR)/config.mk
 else
-	config = make/config.mk
+	config = $(CURDIR)/make/config.mk
 endif
 
+# number of threads
+# NT=4
+
+# the directory where deps are installed
+DEPS_PATH=$(CURDIR)/deps
+
 ROOTDIR = $(CURDIR)
-REPOS = dmlc-core repo/xgboost
-CPBIN = xgboost.dmlc kmeans.dmlc
+REPOS = $(addprefix repo/, dmlc-core xgboost ps-lite rabit)
 
 .PHONY: clean all test pull
 
-all: xgboost.dmlc kmeans.dmlc
+all: xgboost kmeans linear fm bin/text2crb.dmlc
+
+### repos and deps
 
 # dmlc-core
-dmlc-core:
-	git clone https://github.com/dmlc/dmlc-core; cd $(ROOTDIR)
+repo/dmlc-core:
+	git clone https://github.com/dmlc/dmlc-core $@
+	ln -s repo/dmlc-core/tracker .
 
-dmlc-core/libdmlc.a: | dmlc-core
-	+	cd dmlc-core; make libdmlc.a config=$(ROOTDIR)/$(config); cd $(ROOTDIR)
+repo/dmlc-core/libdmlc.a: | repo/dmlc-core glog
+	+	$(MAKE) -C repo/dmlc-core libdmlc.a config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
 
-# xgboost
-repo/xgboost:
-	cd repo; git clone https://github.com/dmlc/xgboost; cd $(ROOTDIR)
+core: | repo/dmlc-core glog					# always build
+	+	$(MAKE) -C repo/dmlc-core libdmlc.a config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
 
-repo/xgboost/xgboost: dmlc-core/libdmlc.a | repo/xgboost dmlc-core
-	+	cd repo/xgboost; make dmlc=$(ROOTDIR)/dmlc-core config=$(ROOTDIR)/$(config)
-
-# parameter server
+# ps-lite
 repo/ps-lite:
-	git clone https://github.com/dmlc/ps-lite repo/ps-lite
+	git clone https://github.com/dmlc/ps-lite $@
+
+repo/ps-lite/build/libps.a: | repo/ps-lite deps
+	+	$(MAKE) -C repo/ps-lite ps config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
+
+
+ps-lite: | repo/ps-lite deps 	# awlays build
+	+	$(MAKE) -C repo/ps-lite ps config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
 
 # rabit
 repo/rabit:
-	cd repo; git clone https://github.com/dmlc/rabit; cd $(ROOTDIR)
+	git clone https://github.com/dmlc/rabit $@
 
 repo/rabit/lib/librabit.a:  | repo/rabit
-	+	cd repo/rabit; make; cd $(ROOTDIR)
+	+	$(MAKE) -C repo/rabit
 
-learn/kmeans/kmeans.dmlc: learn/kmeans/kmeans.cc |repo/rabit/lib/librabit.a dmlc-core/libdmlc.a
-	+	cd learn/kmeans;make kmeans.dmlc; cd $(ROOTDIR)
+rabit: repo/rabit/lib/librabit.a
 
+# deps
+include make/deps.mk
 
-# toolkits
-xgboost.dmlc: repo/xgboost/xgboost
+deps: gflags glog protobuf zmq lz4 cityhash
+
+### toolkits
+
+# xgboost
+repo/xgboost:
+	git clone https://github.com/dmlc/xgboost $@
+
+repo/xgboost/xgboost: repo/dmlc-core/libdmlc.a | repo/xgboost
+	+	$(MAKE) -C repo/xgboost config=$(config)
+
+bin/xgboost.dmlc: repo/xgboost/xgboost
 	cp $+ $@
 
-kmeans.dmlc: learn/kmeans/kmeans.dmlc
+xgboost: bin/xgboost.dmlc
+
+# kmeans
+learn/kmeans/kmeans.dmlc: learn/kmeans/kmeans.cc | repo/rabit/lib/librabit.a repo/dmlc-core/libdmlc.a
+	+	$(MAKE) -C learn/kmeans kmeans.dmlc DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
+
+bin/kmeans.dmlc: learn/kmeans/kmeans.dmlc
 	cp $+ $@
+
+kmeans: bin/kmeans.dmlc
+
+# linear
+learn/linear/build/linear.dmlc: ps-lite core repo/ps-lite/build/libps.a repo/dmlc-core/libdmlc.a
+	$(MAKE) -C learn/linear config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
+
+bin/linear.dmlc: learn/linear/build/linear.dmlc
+	cp $+ $@
+
+linear: bin/linear.dmlc
+
+# FM
+learn/difacto/build/fm.dmlc: ps-lite core repo/ps-lite/build/libps.a repo/dmlc-core/libdmlc.a
+	$(MAKE) -C learn/difacto config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
+
+bin/fm.dmlc: learn/difacto/build/fm.dmlc
+	cp $+ $@
+
+fm: bin/fm.dmlc
+
+# tools
+
+bin/text2crb.dmlc:
+	$(MAKE) -C learn/tool text2crb config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
+	cp learn/tool/text2crb $@
 
 
 pull:
@@ -60,7 +114,7 @@ pull:
 clean:
 	for prefix in $(REPOS); do \
 		if [ -d $$prefix ]; then \
-			cd $$prefix; make clean; cd $(ROOTDIR); \
+			$(MAKE) -C $$prefix clean; \
 		fi \
 	done
-	rm -rf $(BIN) *~ */*~
+	rm -rf bin/*.dmlc

@@ -5,11 +5,10 @@
 #ifndef DMLC_DATA_CRITEO_PARSER_H_
 #define DMLC_DATA_CRITEO_PARSER_H_
 #include <limits>
+#include <city.h>
 #include "data/row_block.h"
 #include "data/parser.h"
 #include "data/strtonum.h"
-#include "base/crc32.h"
-#include "proto/data_format.pb.h"
 #include "dmlc/recordio.h"
 namespace dmlc {
 namespace data {
@@ -23,8 +22,10 @@ namespace data {
 template <typename IndexType>
 class CriteoParser : public ParserImpl<IndexType> {
  public:
-  explicit CriteoParser(InputSplit *source)
-      : bytes_read_(0), source_(source) { }
+  static const int kNumBitForFeaGrp = 10;
+  explicit CriteoParser(InputSplit *source, bool is_train)
+      : bytes_read_(0), source_(source), is_train_(is_train) {
+  }
   virtual ~CriteoParser() {
     delete source_;
   }
@@ -46,38 +47,40 @@ class CriteoParser : public ParserImpl<IndexType> {
     data->resize(1);
     RowBlockContainer<IndexType>& blk = (*data)[0];
     blk.Clear();
-    IndexType kmax = std::numeric_limits<IndexType>::max();
-    IndexType itv = kmax / 13 + 1;
     char *pp = p;
     while (p != end) {
       while (*p == '\r' || *p == '\n') ++p;
       if (p == end) break;
 
       // parse label
-      pp = Find(p, end, '\t');
-      CHECK_NE(pp, p) << "cannot parse criteo test data";
-      blk.label.push_back(atof(p));
-      p = pp + 1;
+      if (is_train_) {
+        pp = Find(p, end, '\t');
+        CHECK_NE(p, pp) << "no label.., try criteo_test";
+        blk.label.push_back(atof(p));
+        p = pp + 1;
+      } else {
+        blk.label.push_back(0);
+      }
 
       // parse inter feature
-      for (IndexType i = 0,  os = 0; i < 13; ++i, os += itv) {
+      for (IndexType i = 0; i < 13; ++i) {
         pp = Find(p, end, '\t');
         CHECK_NOTNULL(pp);
         if (pp > p) {
-          blk.index.push_back(atol(p) + os);
+          blk.index.push_back((CityHash64(p, pp-p)<<kNumBitForFeaGrp)+i);
         }
         p = pp + 1;
       }
 
       // parse categorty feature
       for (int i = 0; i < 26; ++i) {
-        if (isspace(*p)) {
-          ++ p; continue;
-        }
-        pp = p + 8; CHECK(isspace(*pp)) << *pp;
+        if (p == end) break;
+        if (isspace(*p)) { ++ p; continue; }
+        pp = p + 8; CHECK(isspace(*pp)) << i << " " << end - p << " " << *p;
         size_t len = pp - p;
-        if (len) blk.index.push_back(CRC32HW(p, len));
+        if (len) blk.index.push_back((CityHash64(p, len)<<kNumBitForFeaGrp)+i+13);
         p = pp + 1;
+        if (*pp == '\n' || *pp == '\r') break;
       }
       blk.offset.push_back(blk.index.size());
     }
@@ -96,75 +99,7 @@ class CriteoParser : public ParserImpl<IndexType> {
   size_t bytes_read_;
   // source split that provides the data
   InputSplit *source_;
-};
-
-template <typename IndexType>
-class CriteoRecParser : public ParserImpl<IndexType> {
- public:
-  CriteoRecParser(InputSplit *source)
-      : bytes_read_(0), source_(source) { }
-  virtual ~CriteoRecParser() {
-    delete source_;
-  }
-
-  virtual void BeforeFirst(void) {
-    source_->BeforeFirst();
-  }
-  virtual size_t BytesRead(void) const {
-    return bytes_read_;
-  }
-  virtual bool ParseNext(std::vector<RowBlockContainer<IndexType> > *data) {
-    InputSplit::Blob chunk;
-    if (!source_->NextChunk(&chunk)) return false;
-    CHECK(chunk.size != 0);
-    bytes_read_ += chunk.size;
-
-    data->resize(1);
-    RowBlockContainer<IndexType>& blk = (*data)[0];
-    blk.Clear();
-
-    IndexType itv = std::numeric_limits<IndexType>::max() / 13 + 1;
-    std::string str;
-    data::Criteo pb;
-    InputSplit::Blob rec;
-    RecordIOChunkReader reader(chunk);
-    while (reader.NextRecord(&rec)) {
-      CHECK(pb.ParseFromArray(rec.dptr, rec.size));
-
-      // label
-      blk.label.push_back(pb.label());
-
-      // parse categorty feature
-      uint32_t miss_int = pb.miss_int();
-      int k = 0;
-      for (IndexType i = 0,  os = 0; i < 13; ++i, os += itv) {
-        if (miss_int & (1<<i)) continue;
-        CHECK_LT(k, pb.dint_size());
-        blk.index.push_back(pb.dint(k) + os);
-        ++ k;
-      }
-      CHECK_EQ(k, pb.dint_size());
-
-      uint32_t miss_cat = pb.miss_cat();
-      k = 0;
-      for (int i = 0; i < 26; ++i) {
-        if (miss_cat & (1<<i)) continue;
-        CHECK_LT(k, pb.dcat_size());
-        blk.index.push_back(pb.dcat(k));
-        ++ k;
-      }
-      CHECK_EQ(k, pb.dcat_size());
-
-      blk.offset.push_back(blk.index.size());
-    }
-    return true;
-  }
-
- private:
-  // number of bytes readed
-  size_t bytes_read_;
-  // source split that provides the data
-  InputSplit *source_;
+  bool is_train_;
 };
 
 }  // namespace data

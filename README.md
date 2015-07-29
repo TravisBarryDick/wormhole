@@ -1,4 +1,7 @@
-![Wormhole](wormhole.png)
+<img src=wormhole.png width=400/>
+
+[![Build Status](https://travis-ci.org/dmlc/wormhole.svg?branch=master)](https://travis-ci.org/dmlc/wormhole)
+[![Documentation Status](https://readthedocs.org/projects/wormhole/badge/?version=latest)](https://readthedocs.org/projects/wormhole/?badge=latest)
 
 Portable, scalable and reliable distributed machine learning.
 
@@ -17,20 +20,42 @@ Features
 List of Tools
 ====
 * Boosted Trees (GBDT): [XGBoost: eXtreme Gradient Boosting](learn/xgboost)
-* [L-BFGS based linear solver](learn/lbfgs-linear)
-* [Asynchrouns SGD linear solver](learn/linear/guide)
+* Clustering: [kmeans](learn/kmeans)
+* Linear method: [Asynchrouns SGD](learn/linear) [L-BFGS](learn/lbfgs-linear)
+* Factorization Machine: [DiFacto](learn/difacto)
 
 Build
 ====
-* copy ```make/config.mk``` to root folder
-* modify according to your settings
-* type ```make``` or ```make name-of-tool-you-want```
+* Requires a C++11 compiler such as `g++ >=4.8` and `git`. You can install them via
+```
+sudo apt-get update && sudo apt-get install -y build-essential git
+```
+on Ubuntu >= 13.10. For
+[older Ubuntu](http://ubuntuhandbook.org/index.php/2013/08/install-gcc-4-8-via-ppa-in-ubuntu-12-04-13-04/),
+[Centos](http://linux.web.cern.ch/linux/devtoolset/),
+[Mac Os X](http://hpc.sourceforge.net/).
+
+* Type `make` to build all deps and tools, it takes several minutes in the fist time.
+
+* More options are available
+  - `make xgboost` to selectly build one tool
+  - `make -j4` uses 4 threads
+  - `make CXX=gcc-4.9` changes the compiler
+  - `make DEPS_PATH=your_path` changes the path of the deps libaries
+  - `make USE_HDFS=1` to enable read/write HDFS. Make sure hadoop is installed.
+  - `make USE_S3=1` to enable read/write AWS S3 files. You may need to install
+    `libcurl4-openssl-dev` first via `sudo apt-get install libcurl4-openssl-dev`
 
 How to Submit Jobs
 ====
-* make sure dmlc-core exist in root folder
-  - type ```make dmlc-core``` to get it
-* Use the submission script in ```dmlc-core/tracker``` to submit job to the platform of your choice
+* All tools can run both in your laptop and in a cluster. For example, the following
+command runs linear logistic regression using single worker and server on a
+small dataset.
+```
+tracker/dmlc_local.py -n 1 -s 1 bin/linear.dmlc learn/linear/guide/demo.conf
+```
+
+* See more trackers in ```tracker/```
 
 Contributing
 ====

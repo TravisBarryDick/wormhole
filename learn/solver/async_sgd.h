@@ -29,6 +29,9 @@ class AsyncSGDScheduler : public ps::App {
   std::string train_data_;
   std::string val_data_;
   std::string data_format_;
+  std::string model_in_;
+  std::string model_out_;
+
   bool worker_local_data_ = false;
   int load_model_ = 0;
   int save_model_ = 0;
@@ -37,8 +40,8 @@ class AsyncSGDScheduler : public ps::App {
   int cur_data_pass_ = 1;  // start from 1
   Workload::Type cur_type_;
   int disp_itv_ = 1;
-
-  virtual bool Stop(const Progress& cur, const Progress& prev) {
+  bool predict_ = false;
+  virtual bool Stop(const Progress& cur, const Progress& prev, bool train) {
     return false;
   }
 
@@ -53,9 +56,11 @@ class AsyncSGDScheduler : public ps::App {
     disp_itv_          = conf.disp_itv();
     save_model_        = conf.save_model();
     load_model_        = conf.load_model();
-    if (save_model_) CHECK(conf.model_out().size()) << "empty model_out";
-    if (load_model_) CHECK(conf.model_in().size()) << "empty model_in";
+    model_in_          = conf.model_in();
+    model_out_         = conf.model_out();
+    predict_           = conf.pred_out().size() > 0;
   }
+
  public:
   AsyncSGDScheduler() {
     sys_.manager().AddNodeFailureHandler([this](const std::string& id) {
@@ -92,13 +97,27 @@ class AsyncSGDScheduler : public ps::App {
            ps::NumServers(), ps::NumWorkers());
     start_time_ = GetTime();
 
-    if (load_model_ > 0) {
-      printf("loading model from #iter = %d\n", load_model_);
-      cur_data_pass_ = load_model_;
-      ps::Task task; task.set_cmd(kLoadModel + cur_data_pass_ * kMaxNumCmd);
+    if (predict_) {
+      CHECK(model_in_.size()) << "should provide model_in for prediction";
+    }
+
+    if (model_in_.size()) {
+      if (load_model_ > 0) {
+        printf("loading model from #iter = %d\n", load_model_);
+        cur_data_pass_ = load_model_;
+      } else {
+        printf("loading the last model\n");
+        cur_data_pass_ = 0;
+      }
+      ps::Task task; task.set_cmd(kLoadModel + load_model_ * kMaxNumCmd);
       Wait(Submit(task, ps::kServerGroup));
       Iterate(Workload::VAL);
       ++ cur_data_pass_;
+    }
+
+    if (predict_) {
+      printf("prediction is done!\n");
+      return true;
     }
 
     for (; cur_data_pass_ <= max_data_pass_; ++cur_data_pass_) {
@@ -112,16 +131,21 @@ class AsyncSGDScheduler : public ps::App {
     }
 
     SaveModel(true);
-    printf("async_sgd is done!\n");
+    printf("training is done!\n");
     return true;
   }
 
  private:
   void SaveModel(bool force) {
-    if (save_model_ == 0) return;
-    if (force || cur_data_pass_ % save_model_ == 0) {
-      printf("saving model #iter = %d\n", cur_data_pass_);
-      ps::Task task; task.set_cmd(kSaveModel + cur_data_pass_ * kMaxNumCmd);
+    if (model_out_.size() == 0) return;
+    if (force || (save_model_ > 0 && cur_data_pass_ % save_model_ == 0)) {
+      int iter = force ? 0 : cur_data_pass_;
+      if (iter == 0) {
+        printf("saving final model to %s\n", model_out_.c_str());
+      } else {
+        printf("saving model to %s-iter_%d\n", model_out_.c_str(), iter);
+      }
+      ps::Task task; task.set_cmd(kSaveModel + iter * kMaxNumCmd);
       Wait(Submit(task, ps::kServerGroup));
     }
   }
@@ -131,11 +155,17 @@ class AsyncSGDScheduler : public ps::App {
     cur_type_ = type;
     bool stop = false;
     std::string data;
-    if (type == Workload::TRAIN) {
+    bool is_train = type == Workload::TRAIN;
+    if (is_train) {
       printf("training #iter = %d\n", cur_data_pass_);
       data = train_data_;
     } else {
-      printf("validating #iter = %d\n", cur_data_pass_);
+      if (predict_) {
+        CHECK(val_data_.size()) << "should provide val_data for prediction";
+        printf("predicting\n");
+      } else {
+        printf("validating #iter = %d\n", cur_data_pass_);
+      }
       data = val_data_;
     }
     if (data.empty()) return stop;
@@ -144,6 +174,16 @@ class AsyncSGDScheduler : public ps::App {
     if (!worker_local_data_) {
       Workload wl; pool_.Match(data, &wl);
       pool_.Add(wl.file, num_part_per_file_);
+      if (predict_) {
+        CHECK_EQ(wl.file.size(), (size_t)1)
+            << "use single file for prediction";
+      }
+      size_t nwl = wl.file.size() * num_part_per_file_;
+      if (cur_data_pass_ == 1 && (nwl < ps::NumWorkers())) {
+        fprintf(stderr, "WARNING: # of data file (%d) < # of workers (%d)\n",
+                (int)nwl, (int)ps::NumWorkers());
+        fprintf(stderr, "         You may want to increase \"num_parts_per_file\"\n");
+      }
     }
 
     // send an empty workerload to all workers
@@ -151,28 +191,34 @@ class AsyncSGDScheduler : public ps::App {
 
     // print every k sec for training, while print at the end for validation
     printf("  sec %s\n", prog_.HeadStr().c_str());
+    fflush(stdout);
+
     while (!pool_.IsFinished()) {
       sleep(disp_itv_);
-      if (type == Workload::TRAIN) {
-        if (ShowProgress()) {
+      if (is_train) {
+        if (ShowProgress(is_train)) {
           stop = true;
           pool_.ClearRemain();
         }
       }
     }
-    if (type != Workload::TRAIN) stop = ShowProgress();
+    if (type != Workload::TRAIN) {
+      stop = ShowProgress(is_train);
+    }
     return stop;
   }
 
   // return true if it's time for stopping
-  bool ShowProgress() {
+  bool ShowProgress(bool is_train) {
     bool ret = false;
     Progress cur;
     monitor_.Get(&cur); monitor_.Clear();
     auto disp = cur.PrintStr(&prog_);
     if (disp.empty()) return ret;
     printf("%5.0lf  %s\n", GetTime() - start_time_, disp.c_str());
-    if (Stop(cur, prog_)) ret = true;
+    fflush(stdout);
+
+    if (Stop(cur, prog_, is_train)) ret = true;
     prog_.Merge(&cur);
     return ret;
   }
@@ -189,7 +235,6 @@ class AsyncSGDScheduler : public ps::App {
   bool done_ = false;
   Progress prog_;
   ProgressMonitor<Progress> monitor_;
-  int last_save_ = -1;
 };
 
 /**************************************************************************
@@ -198,14 +243,21 @@ class AsyncSGDScheduler : public ps::App {
  **************************************************************************/
 class AsyncSGDServer : public ps::App {
  protected:
-  virtual void SaveModel(int iter) = 0;
-  virtual void LoadModel(int iter) = 0;
-
   /**
    * \brief Report the progress to the scheduler
    */
   void Report(const IProgress* const prog) {
     reporter_.Report(prog);
+  }
+
+  virtual void SaveModel(int iter) = 0;
+  virtual void LoadModel(int iter) = 0;
+
+  std::string ModelName(const std::string& base, int iter) {
+    CHECK(base.size()) << "empty model name";
+    std::string name = base;
+    if (iter > 0) name += "_iter-" + std::to_string(iter);
+    return name + "_part-" + std::to_string(ps::MyRank());
   }
 
  public:
@@ -226,6 +278,7 @@ class AsyncSGDServer : public ps::App {
 
  private:
   ProgressReporter reporter_;
+
 };
 
 /*****************************************************************************
@@ -243,8 +296,7 @@ class AsyncSGDWorker : public ps::App {
   /**
    * \brief Process one minibatch
    */
-  virtual void ProcessMinibatch(
-      const Minibatch& mb, int data_pass, bool train) = 0;
+  virtual void ProcessMinibatch(const Minibatch& mb, const Workload& wl) = 0;
 
   /**
    * \brief Mark one minibatch is finished
@@ -259,12 +311,22 @@ class AsyncSGDWorker : public ps::App {
     reporter_.Report(prog);
   }
 
+  std::string PredictName(const std::string& base, int part) {
+    CHECK(base.size());
+    char* fname = new char[1000];
+    snprintf(fname, 1000, "%s_part-%02d", base.c_str(), part);
+    return std::string(fname);
+  }
+
   int minibatch_size_ = 10000;
-  int max_delay_ = 4;
+  int shuffle_ = 0;
+  int max_delay_ = 0;
 
   // for validation test
   int val_minibatch_size_ = 1000000;
   int val_max_delay_ = 10;
+
+  bool predict_ = false;
 
   bool worker_local_data_ = false;
   std::string train_data_;
@@ -272,10 +334,15 @@ class AsyncSGDWorker : public ps::App {
 
   double workload_time_;
 
+  float neg_sampling_ = 1.0;
+
   template <typename Config>
   void Init(const Config& conf) {
     minibatch_size_ = conf.minibatch();
+    shuffle_        = conf.rand_shuffle();
     max_delay_      = conf.max_delay();
+    predict_        = conf.pred_out().size() > 0;
+    neg_sampling_   = conf.neg_sampling();
     if (conf.use_worker_local_data()) {
       train_data_        = conf.train_data();
       val_data_          = conf.val_data();
@@ -315,9 +382,14 @@ class AsyncSGDWorker : public ps::App {
   void Process(const Workload& wl) {
     bool train = wl.type == Workload::TRAIN;
     int mb_size = train ? minibatch_size_ : val_minibatch_size_;
-    int max_delay = train ? max_delay_ : val_max_delay_;
+    int shuffle = train ? minibatch_size_ * shuffle_ : 0;
+    int max_delay = predict_ ? 0 : (train ? max_delay_ : val_max_delay_);
+    float neg_sampling = train ? neg_sampling_ : 1.0;
     LOG(INFO) << ps::MyNodeID() << ": " << wl.ShortDebugString()
-              << ", minibatch = " << mb_size << ", max_delay = " <<  max_delay;
+              << ", minibatch = " << mb_size
+              << ", max_delay = " <<  max_delay
+              << ", shuffle size = " << shuffle
+              << ", negative sampling = " << neg_sampling;
 
     num_mb_fly_ = num_mb_done_ = 0;
     start_ = GetTime();
@@ -326,13 +398,14 @@ class AsyncSGDWorker : public ps::App {
     CHECK_EQ(wl.file.size(), (size_t)1);
     auto file = wl.file[0];
     dmlc::data::MinibatchIter<FeaID> reader(
-        file.filename.c_str(), file.k, file.n, file.format.c_str(), mb_size);
+        file.filename.c_str(), file.k, file.n, file.format.c_str(),
+        mb_size, shuffle, neg_sampling);
     reader.BeforeFirst();
     while (reader.Next()) {
       // wait for data consistency
       WaitMinibatch(max_delay);
 
-      ProcessMinibatch(reader.Value(), wl.data_pass, train);
+      ProcessMinibatch(reader.Value(), wl);
 
       mb_mu_.lock(); ++ num_mb_fly_; mb_mu_.unlock();
     }
