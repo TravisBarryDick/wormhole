@@ -15,7 +15,7 @@
 #include "base/crb_parser.h"
 #include "base/debug.h"
 #include "base/rbcBinary_parser.h"
-#include "base/utils.h"
+
 namespace dmlc {
 namespace data {
 
