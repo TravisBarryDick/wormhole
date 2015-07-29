@@ -861,7 +861,7 @@ int main(int argc, char *argv[])
 
 #else
 
-int main()
+int main1()
 {
 	using namespace dddml;
 	using namespace std;
@@ -921,7 +921,7 @@ int main()
 
 }
 
-int main1()
+int main()
 {
 	using namespace dddml;
 	using namespace std;

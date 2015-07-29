@@ -23,7 +23,6 @@ using namespace dmlc::data;
 /*
 *	Sub-sample data
 *
-	TO-DO: 1. get args from conf file
 */
 
 
@@ -110,6 +109,7 @@ using real_t = dmlc::real_t;
 	{
 		for (int part = 0; part < nPartToRead; ++part)
 		{
+			std::cout << "DEBUGGING: new part" << std::endl;
 			partID = dis(rng);
 			//TODO: verify filename
 			char filename[200];
@@ -118,9 +118,11 @@ using real_t = dmlc::real_t;
 			MinibatchIter<FeaID> reader(
 				filename, partID, nPartPerFile,
 				data_format, mb_size);
+			std::cout << "DEBUGGING: starting read\n";
 			reader.BeforeFirst();
 			while (reader.Next()) {
 				auto mb = reader.Value(); //row block
+				std::cout << "DEBUGGING: read a row block " << std::endl;
 				for (size_t i = 0; i < mb.size; ++i)
 				{
 					//decide whether to add row mb[i] to the sample or not
@@ -139,9 +141,9 @@ using real_t = dmlc::real_t;
 	/* Step 3: Localize */
 	dmlc::RowBlock<FeaID> sample1 = sample.GetBlock();
 	/* 3.1: read feature file */
-	int SomeDefaultStartingValue = 10000; //TODO
+	//int SomeDefaultStartingValue = 10000; //TODO
 	std::vector<FeaID> features;
-	features.reserve(SomeDefaultStartingValue);
+	//features.reserve(SomeDefaultStartingValue);
 	ReadFile(featureFile, &features);
 	/* 3.2: Get set of features to keep using localizer */
 	dmlc::Localizer <FeaID> lc;
@@ -162,7 +164,7 @@ using real_t = dmlc::real_t;
 	lc.RemapIndex<FeaID>(sample1, *idx_dict, sample_compressed);
 
 
-	// std::cout << "DEBUG: sample_compressed->Size() = " << sample_compressed->Size() << std::endl;
+	 std::cout << "DEBUG: sample_compressed->Size() = " << sample_compressed->Size() << std::endl;
 	// for (size_t i = 0; i < sample_compressed->Size(); ++i) {
 	// 	std::cout << sample_compressed->GetBlock()[i].length << " ";
 	// }
@@ -193,8 +195,6 @@ App* App::Create(int argc, char *argv[]) {
 int main(int argc, char *argv[])
 {
 	using namespace dddml;
-	std::random_device rd;
-	std::mt19937_64 rng (rd());
 	ArgParser parser;
 	if (argc > 1 && strcmp(argv[1], "none")) parser.ReadFile(argv[1]);
 	parser.ReadArgs(argc - 2, argv + 2);
@@ -220,6 +220,9 @@ int main(int argc, char *argv[])
 
 	//int nfile = conf.n_files(),
 
+	std::random_device rd;
+	int seed = conf.seed();
+        std::mt19937_64 rng (seed);
 
 	subsample(featureFile, data_directory, outputFile,data_format, subsample_size, total_size, rng,
 			conf.n_files(), conf.n_parts_per_file(), conf.n_parts_to_read(), conf.analysis_minibatch_size());
