@@ -10,6 +10,7 @@ clean:
 
 bin: build/datasplit build/analyze_criteo build/kmeans build/dispatcher
 
+
 build/%.o: %.cc
 	@mkdir -p $(@D)
 	$(CXX) $(CFLAGS) -MM -MT build/$*.o $< >build/$*.d
@@ -18,20 +19,20 @@ build/%.o: %.cc
 %.pb.cc %.pb.h : %.proto
 	${DEPS_PATH}/bin/protoc --cpp_out=. --proto_path=. $<
 
-build/datasplit: build/dddml_config.pb.o build/datasplit.o  ../base/base.a   $(PS_PATH)/build/libps.a
+build/datasplit: build/dddml_config.pb.o build/datasplit.o  $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
-build/trial: build/dddml_config.pb.o build/trial.o  ../base/base.a   $(PS_PATH)/build/libps.a
+build/trial: build/dddml_config.pb.o build/trial.o $(DMLC_SLIB) 
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
-build/dispatcher: build/dddml_config.pb.o build/dispatcher.o ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
+build/dispatcher: build/dddml_config.pb.o build/dispatcher.o $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
-build/analyze_criteo: build/dddml_config.pb.o build/analyze_criteo.o ../base/base.a RPTS.h $(PS_PATH)/build/libps.a
+build/analyze_criteo: build/dddml_config.pb.o build/analyze_criteo.o $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 
-build/kmeans: build/dddml_config.pb.o build/kmeans.o  ../base/base.a   $(PS_PATH)/build/libps.a
+build/kmeans: build/dddml_config.pb.o build/kmeans.o  $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 -include build/*.d
