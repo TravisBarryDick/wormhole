@@ -7,7 +7,7 @@
 #include "../base/localizer.h"
 #include "../base/minibatch_iter.h"
 #include "ps.h"
-#include "kmeans_helper.h"
+#include "kmeans.h"
 #include "RPTS.h"
 #include "BufferedWriter.h"
 

@@ -802,9 +802,9 @@ int main(int argc, char *argv[])
 
 	std::random_device rd;
 	//auto seed = rd();
-	auto seed = conf.seed();
-	std::cout << "Seed: " << seed << std::endl;
-	std::mt19937_64 rng(seed);
+	//auto seed = conf.seed();
+	//std::cout << "Seed: " << seed << std::endl;
+	std::mt19937_64 rng(rd());
 
 	/*
 		Parameters:

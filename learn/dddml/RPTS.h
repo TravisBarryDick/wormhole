@@ -6,7 +6,7 @@
 #include <memory>
 #include <random>
 #include <vector>
-#include "kmeans_helper.h"
+#include "kmeans.h"
 
 #if DISTRIBUTED
 
