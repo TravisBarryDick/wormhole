@@ -1,12 +1,13 @@
 #include <string>
 #include <random>
 #include <vector>
-#include "kmeans_helper.h"
+#include "kmeans.h"
 #include "sample_helper.h"
 #include <memory>
 #include <queue>
 #include <array>
 #include <algorithm>
+#include <limits>
 #include <sstream>
 #include "RPTS.h"
 
@@ -509,6 +510,7 @@ std::vector<int> _ones(int len)
 template <typename I>
 int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers_t &centers, real_t lower_bound, real_t upper_bound, int k, size_t dim, std::mt19937_64 &rng)
 {
+	CHECK(-1 == 0) << "Outdated; use p-replication version";
 	std::stringstream outs;
 	//preprocess
 	int current_k = k;
@@ -654,7 +656,7 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 	{
 		if (counts[i] >= 0 && counts[i] < current_lower)
 		{
-			//cluster too small. Need to merge it with nearest cluster.
+			//cluster i is too small. Need to merge it with nearest cluster.
 			deleted_indices.push_back(i);
 			int new_index = find_closest(centers, i);
 			++nmerge;
@@ -662,12 +664,15 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 			counts[i] = -1; //destroyed cluster
 			--current_k;
 			std::cout << "Merged cluster " << i << " with cluster " << new_index << std::endl;
+			int counter = 0; 
 			for (int j = 0; j < assignments->size(); ++j)
 			{
-				for (int h = 0; h < p; ++h)
-					if ((*assignments)[j][h] == i) (*assignments)[j][h] = new_index;
+				for (int h = 0; h < p; ++h){
+					if ((*assignments)[j][h] == i) {(*assignments)[j][h] = new_index;}
+				}
 			}
-			//update center:
+			//update centers:
+			centers.reset(i, std::numeric_limits<real_t>::max());
 			update_one_center(centers, data, (*assignments), new_index);
 		}
 	}
@@ -698,7 +703,6 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 					if ((*assignments)[j][h] == i)  //ramdomly assign to one of the split clusters
 					{
 						int temp = dis(rng);
-						//std::cout << '*' << temp << std::endl;
 						(*assignments)[j][h] = temp + current_index;
 					}
 				}
@@ -724,18 +728,30 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 		}
 	}
 	for (int i = 0; i < current_index; ++i) {std::cout << i << ": " << counts1[i] << std::endl; }
-
-
+	
+	
 	//clean-up
-	//re-map indices >=current_k to deleted indices
-	for (int j = 0; j < assignments->size(); ++j)
+	int swap_map[current_index];
+	bool to_be_swapped[current_index];
+	for (int i = 0; i < current_index; ++i) {to_be_swapped[i] = 0; swap_map[i] = -1;}
+	for (int ii = 0, jj = current_index - 1; ii < jj ; )
 	{
-		for (int h = 0; h < p; ++h)
-		{
-			int temp = (*assignments)[j][h] - current_k;
-			if (temp >= 0) (*assignments)[j][h] = deleted_indices[temp];
-		}
+		while(counts1[ii] > 0) ++ii;
+		while(counts1[jj] <= 0) --jj;
+		if (ii >= jj ) break;
+		swap_map[jj] = ii;
+		to_be_swapped[jj] = true;
+		++ii; --jj;
 	}
+	for (int i = 0; i < assignments->size(); ++i)
+	{
+		for (int j = 0; j < p; ++j)
+		{
+			int temp = (*assignments)[i][j];
+			if (to_be_swapped[temp]) (*assignments)[i][j] = swap_map[temp];
+		}
+	} 
+	
 	#if DISTRIBUTED
 	LOG(INFO) << "Merged: " << nmerge << " and split " << nsplit << ".\n Old k: " << k << "; Current k: " << current_k;
 	#else
@@ -785,7 +801,10 @@ int main(int argc, char *argv[])
 
 
 	std::random_device rd;
-	std::mt19937_64 rng(rd());
+	//auto seed = rd();
+	auto seed = conf.seed();
+	std::cout << "Seed: " << seed << std::endl;
+	std::mt19937_64 rng(seed);
 
 	/*
 		Parameters:
@@ -870,6 +889,7 @@ int main(int argc, char *argv[])
 	save_assignments(out_file, &(*assignments));
 	
 	LOG(INFO) << "FINISHED CLUSTERING";
+	
 	
 	// Build a random partition tree on the sample and save it to file
 	RandomPartitionTree<FeaID> rpt(rng, static_cast<int>(conf.dimension()),

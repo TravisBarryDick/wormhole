@@ -69,6 +69,11 @@ public:
 	{
 		std::memset(array, 0, sizeof(real_t) * dim * k);
 	}
+	void reset(int index, real_t val)
+	{
+		for (unsigned long i = index * dim; i < dim*(index + 1); ++i)
+			array[i] = val;
+	}
 
 };
 

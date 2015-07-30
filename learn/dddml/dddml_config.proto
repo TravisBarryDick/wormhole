@@ -12,7 +12,7 @@ message dddmlConfig {
 
 	optional string sample_filename = 14; // name of file with sample.
 
-	optional int32 seed = 15; //seed for sampling
+	optional int64 seed = 15; //seed for sampling
 	///************************************
 
 	optional int32 n_parts_to_read = 101;
