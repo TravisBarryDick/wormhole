@@ -49,9 +49,6 @@ int WorkerNodeMain(int argc, char* argv[]) {
   int first_part = MyRank() * parts_per_worker;
   first_part += min(extra_parts, MyRank());
 
-
-  cout << "GOT THIS FAR" << endl;
-
   // Read the number of clusters
   int k;
   ifstream num_clusters(conf.num_clusters_filename().c_str(), ios::in);
@@ -78,7 +75,6 @@ int WorkerNodeMain(int argc, char* argv[]) {
           static_cast<size_t>(conf.n_parts_per_file()),
           conf.data_format().c_str(),
           static_cast<size_t>(conf.dispatch_minibatch_size()));
-
       reader.BeforeFirst();
       while (reader.Next()) {
         auto mb = reader.Value();
@@ -91,4 +87,5 @@ int WorkerNodeMain(int argc, char* argv[]) {
       }
     }
   }
+  for (auto cw : cluster_writers) cw.Flush();
 }
