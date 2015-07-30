@@ -109,7 +109,6 @@ template<typename I>
 void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments)
 {
 	size_t dim = centers.dim; int k = centers.k;
-	//std::cout << "Updating centers\n";
 	size_t n = data.size;
 	CHECK(data.size == assignments.size());
 	centers.reset();
@@ -510,6 +509,7 @@ std::vector<int> _ones(int len)
 template <typename I>
 int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers_t &centers, real_t lower_bound, real_t upper_bound, int k, size_t dim, std::mt19937_64 &rng)
 {
+	std::stringstream outs;
 	//preprocess
 	int current_k = k;
 	real_t current_lower = lower_bound,
@@ -523,7 +523,13 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 	}
 	std::vector<int> permutation(k);
 	std::vector<int> deleted_indices;
-	std::cout << current_k << std::endl;
+	outs << current_k << std::endl;
+	#if DISTRIBUTED
+	LOG(INFO) << outs;
+	#else
+	std::cout << outs << std::endl;
+	#endif
+	outs.str(std::string());
 	//merge
 	for (int i = 0; i < k; ++i) permutation[i] = i;
 	std::shuffle(permutation.begin(), permutation.end(), rng);
@@ -538,7 +544,13 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 			counts[new_index] += counts[i];
 			counts[i] = -1; //destroyed cluster
 			--current_k;
-			std::cout << "Merged cluster " << i << " with cluster " << new_index << std::endl;
+			outs << "Merged cluster " << i << " with cluster " << new_index << std::endl;
+			#if DISTRIBUTED
+			LOG(INFO) << outs;
+			#else
+			std::cout << outs << std::endl;
+			#endif
+			outs.str(std::string());
 			for (int j = 0; j < assignments->size(); ++j)
 			{
 				if ((*assignments)[j] == i) (*assignments)[j] = new_index;
@@ -563,7 +575,13 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 			//cluster too big. Need to split.
 			nsplit++;
 			int num_new_clusters_for_this_cluster = counts[i] / current_upper + (counts[i] != current_upper); //ceil
-			std::cout << "split cluster " << i << " to clusters " << current_index  << " ... " << (current_index + num_new_clusters_for_this_cluster - 1) << std::endl;
+			outs << "split cluster " << i << " to clusters " << current_index  << " ... " << (current_index + num_new_clusters_for_this_cluster - 1) << std::endl;
+			#if DISTRIBUTED
+			LOG(INFO) << outs;
+			#else
+			std::cout << outs << std::endl;
+			#endif
+			outs.str(std::string());
 			deleted_indices.push_back(i); //delete this index
 			std::vector<int> ones = _ones(num_new_clusters_for_this_cluster);
 			std::discrete_distribution<int> dis (ones.begin(), ones.end());
@@ -572,7 +590,6 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 				if ((*assignments)[j] == i)  //ramdomly assign to one of the split clusters
 				{
 					int temp = dis(rng);
-					//std::cout << '*' << temp << std::endl;
 					(*assignments)[j] = temp + current_index;
 				}
 			}
@@ -851,7 +868,9 @@ int main(int argc, char *argv[])
 	num_clusters << new_k << std::endl;
 	num_clusters.close();
 	save_assignments(out_file, &(*assignments));
-
+	
+	LOG(INFO) << "FINISHED CLUSTERING";
+	
 	// Build a random partition tree on the sample and save it to file
 	RandomPartitionTree<FeaID> rpt(rng, static_cast<int>(conf.dimension()),
 																 static_cast<int>(conf.n_0()), *data_rbc,

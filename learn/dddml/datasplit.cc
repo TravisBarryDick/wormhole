@@ -37,30 +37,30 @@ void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 	else
 	{
 		file->Read(features);
-		std::cout << "DEBUG: "; for (auto pvix : *features) std::cout << pvix << " "; std::cout << std::endl;
+		//std::cout << "DEBUG: "; for (auto pvix : *features) std::cout << pvix << " "; std::cout << std::endl;
 	}
 	delete file;
 }
 
-std::vector<FeaID> *Intersect(std::vector<FeaID> &v1, std::vector<FeaID> &v2)
+std::vector<FeaID> *Intersect(std::vector<FeaID> *v1, std::vector<FeaID> *v2)
 {
 	// features do not exist
-	if (v1.size() == 0) return &v2;
-	else if (v2.size() == 0) return &v1;
+	if (v1->size() == 0) return v2;
+	else if (v2->size() == 0) return v1;
 	//else:
 	std::vector<FeaID> *output = new std::vector<FeaID>();
-	for (unsigned i=0,j=0;((i < v1.size()) && (j < v2.size())); )
+	for (unsigned i=0,j=0;((i < v1->size()) && (j < v2->size())); )
 	{
-		if (v1[i] == v2[j])
+		if ((*v1)[i] == (*v2)[j])
 		{
-			output->push_back(v1[i]);
+			output->push_back((*v1)[i]);
 			++i; ++j;
 		}
-		else if(v1[i] > v2[j])
+		else if((*v1)[i] > (*v2)[j])
 		{
 			++j;
 		}
-		else if (v1[i] < v2[j])
+		else if ((*v1)[i] < (*v2)[j])
 		{
 			++i;
 		}
@@ -109,12 +109,12 @@ using real_t = dmlc::real_t;
 	{
 		for (int part = 0; part < nPartToRead; ++part)
 		{
-			std::cout << "DEBUGGING: new part" << std::endl;
-			partID = dis(rng);
+			partID = dis(rng) ;
+			std::cout << "DEBUGGING: new part: " << partID << std::endl;
 			//TODO: verify filename
 			char filename[200];
-			//std::sprintf(filename, "%s/%d", data_directory, fi);
-			std::sprintf(filename, "%s", data_directory);
+			std::sprintf(filename, "%s/%d", data_directory, fi);
+			//std::sprintf(filename, "%s", data_directory);
 			MinibatchIter<FeaID> reader(
 				filename, partID, nPartPerFile,
 				data_format, mb_size);
@@ -140,25 +140,24 @@ using real_t = dmlc::real_t;
 
 	/* Step 3: Localize */
 	dmlc::RowBlock<FeaID> sample1 = sample.GetBlock();
-	/* 3.1: read feature file */
-	//int SomeDefaultStartingValue = 10000; //TODO
-	std::vector<FeaID> features;
-	//features.reserve(SomeDefaultStartingValue);
-	ReadFile(featureFile, &features);
+	std::vector<FeaID> *features = new std::vector<FeaID>();
+	ReadFile(featureFile, features);
 	/* 3.2: Get set of features to keep using localizer */
 	dmlc::Localizer <FeaID> lc;
 	std::vector<FeaID> *uidx = new std::vector<FeaID>();
-	lc.CountUniqIndex<FeaID>(sample1, /*4,*/ uidx, NULL); //include nthreads = 4 for older version
-
-	std::cout << "DEBUGGING: features.size() = " << features.size()
-						<< " uidx->size() = " << uidx->size() << std::endl;
+	lc.CountUniqIndex<FeaID>(sample1, uidx, NULL); 
+	std::sort(features->begin(), features->end());
 
 	/* 3.3: intersect uidx with features */
-	std::vector<FeaID> *idx_dict = Intersect(features, *uidx);
+	std::vector<FeaID> *idx_dict = Intersect(features, uidx);
+	
+	std::cout << "DEBUGGING: features->size() = " << features->size()
+						<< " uidx->size() = " << uidx->size() 
+						<< " intersection->size() = " << idx_dict->size() << std::endl;
 
-	std::cout << "DEBUGGING: ";
-	for (auto i : *idx_dict) std::cout << i << " ";
-	std::cout << std::endl;
+	//std::cout << "DEBUGGING1: ";
+	//for (auto i : *idx_dict) std::cout << i << ',';
+	//std::cout << std::endl;
 
 	/* 3.4: localize */
 	lc.RemapIndex<FeaID>(sample1, *idx_dict, sample_compressed);
@@ -179,6 +178,9 @@ using real_t = dmlc::real_t;
 	sample_compressed->Save(output);
 	std::cout << "Done sampling" << std::endl;
 	delete output;
+	delete features;
+	delete uidx;
+	if (idx_dict != NULL) delete idx_dict;
 }
 
 } //namespace dddml
@@ -222,7 +224,7 @@ int main(int argc, char *argv[])
 
 	std::random_device rd;
 	int seed = conf.seed();
-        std::mt19937_64 rng (seed);
+    std::mt19937_64 rng (rd());
 
 	subsample(featureFile, data_directory, outputFile,data_format, subsample_size, total_size, rng,
 			conf.n_files(), conf.n_parts_per_file(), conf.n_parts_to_read(), conf.analysis_minibatch_size());
