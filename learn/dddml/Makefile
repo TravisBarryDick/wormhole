@@ -8,7 +8,7 @@ all: bin # tool # test
 clean:
 	rm -rf build/*
 
-bin: build/datasplit build/analyze_criteo build/kmeans build/dispatcher
+bin: build/datasplit build/analyze_dataset build/kmeans build/dispatcher
 
 
 build/%.o: %.cc
@@ -28,7 +28,7 @@ build/trial: build/dddml_config.pb.o build/trial.o $(DMLC_SLIB)
 build/dispatcher: build/dddml_config.pb.o build/dispatcher.o $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
-build/analyze_criteo: build/dddml_config.pb.o build/analyze_criteo.o $(DMLC_SLIB)
+build/analyze_dataset: build/dddml_config.pb.o build/analyze_dataset.o $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 
