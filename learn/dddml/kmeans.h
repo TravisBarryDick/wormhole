@@ -14,12 +14,13 @@
 
 #endif
 
+
+#include "sample_helper.h"
 #include <iostream>
 #include <string>
 #include <cstring>
 #include <random>
 #include <vector>
-#include <cassert>
 #include <queue>
 #include <memory>
 
@@ -45,10 +46,6 @@ public:
 	{
 		return &(array[row_id * dim]);
 	}
-	// real_t* const operator[](size_t row_id)
-	// {
-	// 	return &(array[row_id * dim]);
-	// }
 	centers_t(size_t dim, int k)
 	{
 		this->dim = dim;
@@ -134,14 +131,6 @@ inline real_t squareDist(const Row<I> &r1, const Row<I> &r2)
 template <typename I>
 inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim)
 {
-	#if 0
-	real_t sqdist = 0;
-	for (int i = 0; i < this->dim; ++i) sqdist += r2[i] * (r2[i]);
-	for (int i = 0; i < r1.length; ++i) sqdist += (r1.value[i])*(r1.value[i]);
-	sqdist -= 2 * r1.SDot(r2, this->dim);
-	return sqdist;
-	#endif
-	//#if 0
 	CHECK(r2 != NULL);
 	size_t i,j;
 	real_t sqdist = 0.;
@@ -159,7 +148,7 @@ inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim)
 		}
 		else
 		{
-			CHECK(-2 == 0);
+			CHECK(-2 == 0) << "Should not occur in squared distance between row and vector";
 			//sqdist += (r1.value[i] * r1.value[i]);
 			//++i;
 		}
@@ -225,23 +214,6 @@ inline real_t **initialize_centers(size_t dim, int k)
 	}
 	return centers;
 }
-
-// inline void destroy_center(real_t *arr)
-// {
-// 	CHECK(arr != NULL);
-// 	delete[] arr;
-// }
-
-// inline void destroy_centers(real_t **centers, int k)
-// {
-// 	CHECK(centers != NULL);
-// 	for (int i = 0; i < k; ++i)
-// 	{
-// 		CHECK(centers[i] != NULL);
-// 		delete[] centers[i];
-// 	}
-// 	delete[] centers;
-// }
 
 
 /*
@@ -379,5 +351,95 @@ void read_assignments(const char *inpath,
   delete instream;
 }
 #endif
+
+
+///////////////////////
+// Initialization /////
+///////////////////////
+
+template<typename I>
+void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments, int center_id)
+{
+	size_t dim = centers.dim; int k = centers.k;
+	size_t n = data.size;
+	CHECK(data.size == assignments.size());
+
+	reset(centers[center_id], dim);
+
+	int count = 0;
+	// aggregate all points in a cluster
+	for (int i = 0; i < assignments.size(); ++i)
+	{
+		if (assignments[i] == center_id)
+		{
+			add_into(centers[center_id], dim, data[i]);
+			count += (data.weight == NULL) ? 1 : data.weight[i];
+		}
+	}
+	//average
+	divide_by(centers[center_id], dim, count);
+}
+
+
+/*
+* Pick up random centers to initialize k-means (code: 0)
+*/
+template<typename I>
+centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng)
+{
+	size_t numData = data.size;
+	int *sample = SampleWithoutReplacement(k, numData, rng);
+	//alternative 1:
+	centers_t centers(dim, k);
+	for (int i = 0; i < k; ++i)
+	{
+		add_into(centers[i], dim, data[sample[i]]);
+	}
+
+	return centers;
+}
+
+/*
+*	k-means++ initialization (code: 1)
+*/
+template<typename I>
+centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng)
+{
+	real_t weight;
+	centers_t centers(dim, k);
+
+	size_t numData = data.size;
+	real_t sqdists[numData]; //distances
+	for (int i = 0; i < numData; ++i) sqdists[i] = 0;
+	// initialize first center
+	std::uniform_int_distribution<> dis(0, numData-1);
+
+	add_into(centers[0], dim, data[dis(rng)]);
+
+	//initialize distances
+	for (int j = 0; j < numData; ++j)
+	{
+		weight = (data.weight == NULL) ? 1 : data.weight[j];
+		sqdists[j] = (weight) * squareDist(data[j], centers[0], dim);
+	}
+	//loop for the next (k-1) centers
+	for (int i = 1; i < k; ++i)
+	{
+		//sample next center
+		int next_center = weightedSample(sqdists, numData, rng);
+		add_into(centers[i], dim, data[next_center]);
+
+		//update distances
+		for (int j = 0; j < numData; ++j)
+		{
+			weight = (data.weight == NULL) ? 1 : data.weight[j];
+			sqdists[j] = std::min(sqdists[j], squareDist(data[j], centers[i], dim));
+		}
+	}
+	return centers;
+}
+
+
+
 
 }//namespace dddml
