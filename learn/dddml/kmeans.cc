@@ -9,6 +9,7 @@
 #include <limits>
 #include <sstream>
 #include "RPTS.h"
+#include "config_tools.h"
 
 #if DISTRIBUTED
 
@@ -250,7 +251,7 @@ std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int 
 	#endif
 
 	return std::pair<vector_vector_int_ptr, centers_t>(assignments, centers);
-} 
+}
 
 /*
 *	MERGE AND SPLIT HEURISTICS:
@@ -299,7 +300,7 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 			counts[i] = -1; //destroyed cluster
 			--current_k;
 			std::cout << "Merged cluster " << i << " with cluster " << new_index << std::endl;
-			int counter = 0; 
+			int counter = 0;
 			for (int j = 0; j < assignments->size(); ++j)
 			{
 				for (int h = 0; h < p; ++h){
@@ -317,7 +318,7 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 
 
 	//split
-	for (int i = 0; i < k; ++i) permutation[i] = i; //permute 
+	for (int i = 0; i < k; ++i) permutation[i] = i; //permute
 	std::shuffle(permutation.begin(), permutation.end(), rng);
 	int current_index = k; //starting index for new clusters formed
 	for (int i: permutation)
@@ -363,8 +364,8 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 		}
 	}
 	//for (int i = 0; i < current_index; ++i) {std::cout << i << ": " << counts1[i] << std::endl; }
-	
-	
+
+
 	//clean-up
 	int swap_map[current_index];
 	bool to_be_swapped[current_index];
@@ -385,8 +386,8 @@ int merge_and_split(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
 			int temp = (*assignments)[i][j];
 			if (to_be_swapped[temp]) (*assignments)[i][j] = swap_map[temp];
 		}
-	} 
-	
+	}
+
 	#if DISTRIBUTED
 	LOG(INFO) << "Merged: " << nmerge << " and split " << nsplit << ".\n Old k: " << k << "; Current k: " << current_k;
 	#else
@@ -422,108 +423,86 @@ myPair readSamplingOutput(const char *filename)
 	return myPair(idx, data);
 }
 
+int main(int argc, char *argv[]) {
+  using namespace dddml;
+  using namespace std;
+  using namespace dmlc;
 
-int main(int argc, char *argv[])
-{
-	using namespace dddml;
-	using namespace std;
-	using namespace dmlc;
-	ArgParser parser;
-	if (argc > 1 && strcmp(argv[1], "none")) parser.ReadFile(argv[1]);
-	parser.ReadArgs(argc - 2, argv + 2);
-	dddml::dddmlConfig conf;
-	parser.ParseToProto(&conf);
+  ConfigWrapper cfg(argv[1]);
 
+  std::mt19937_64 rng(cfg.clustering_seed);
+  int k = cfg.clustering_num_clusters;
+  int p = cfg.clustering_replication;
+  real_t lfrac = cfg.clustering_lower_capacity;
+  real_t Lfrac = cfg.clustering_upper_capacity;
+  const char *data_file = cfg.dispatch_sample_file.c_str();
+  const char *out_file = cfg.dispatch_assignments_file.c_str();
 
-	std::random_device rd;
-	auto seed = rd();
-	//auto seed = conf.seed();
-	std::mt19937_64 rng(seed);
+  auto readpair = readSamplingOutput(cfg.dispatch_sample_file.c_str());
+  auto idx_dict = readpair.first;
+  int dim = idx_dict->size();  // dim = size of idx_dict
+  dmlc::data::RowBlockContainer<FeaID> *data_rbc =
+      readpair.second;  // pointer to row block container with data
+  auto data = data_rbc->GetBlock();
+  int n = data.size;
 
-	/*
-		Parameters:
-			- n_clusters: K: number of clusters
-			- replication_factor: p: replication factor
-			- cluster_lower_bound: l: lower bound (fraction)
-			- cluster_upper_bound: L: upper bound (fraction)
-			- data_file: file with idx_map and localized row block
-			- assignments_file: file to write assignments to
-	*/
+  real_t lb = lfrac * n * p / k;
+  real_t ub = Lfrac * n * p / k;
 
-	int k = conf.n_clusters(),
-		p = conf.replication_factor();
-	real_t lfrac = conf.cluster_lower_bound(),
-		Lfrac = conf.cluster_upper_bound();
-	const char *data_file = conf.sample_filename().c_str(), *out_file = conf.assignments_filename().c_str();
+  auto output = kmeans(data, k, p, dim, rng, 0);
+  auto assignments = output.first;
+  auto centers = output.second;
 
-	auto readpair = readSamplingOutput(data_file);
-	auto idx_dict = readpair.first;
-	int dim = idx_dict->size(); // dim = size of idx_dict
-	dmlc::data::RowBlockContainer<FeaID>* data_rbc = readpair.second;  // pointer to row block container with data
-	auto data = data_rbc->GetBlock();
-	int n = data.size;
+  // printing
+  int counts[k];
+  for (int i = 0; i < k; ++i) {
+    counts[i] = 0;
+  }
 
-	real_t lb = lfrac * n * p / k,
-			ub = Lfrac * n * p / k;
+  for (int i = 0; i < assignments->size(); ++i) {
+    for (int j = 0; j < p; ++j) {
+      int cl = (*assignments)[i][j];
+      ++counts[cl];
+    }
+  }
+  for (int i = 0; i < k; ++i) {
+    std::cout << i << ": " << counts[i] << "; " << std::endl;
+  }
+  std::cout << "-----------------------\n";
 
-	auto output = kmeans(data,  k, p , dim, rng, 0);
-	auto assignments = output.first;
-	auto centers = output.second;
+  // heuristics
+  int new_k = merge_and_split(data, assignments, centers, lb, ub, k, dim, rng);
 
-	//printing
-	int counts[k];
-	for (int i = 0; i < k; ++i) {counts[i] = 0;}
+  // printing
+  int counts1[new_k];
+  for (int i = 0; i < new_k; ++i) {
+    counts1[i] = 0;
+  }
 
-	for (int i = 0; i < assignments->size(); ++i)
-	{
-		for (int j = 0; j < p; ++j)
-		{
-			int cl = (*assignments)[i][j];
-			++counts[cl];
-		}
-	}
-	for (int i = 0; i < k; ++i)
-	{
-		std::cout << i << ": " << counts[i] << "; " << std::endl;
-	}
-	std::cout << "-----------------------\n";
+  for (int i = 0; i < assignments->size(); ++i) {
+    for (int j = 0; j < p; ++j) {
+      int cl = (*assignments)[i][j];
+      ++counts1[cl];
+    }
+  }
+  for (int i = 0; i < new_k; ++i) {
+    std::cout << i << ": " << counts1[i] << std::endl;
+  }
+  centers.destroy();
 
+  // Save the number of clusters and the assignments file
+  std::ofstream num_clusters(cfg.dispatched_num_clusters_file.c_str(),
+                             std::ios::out);
+  num_clusters << new_k << std::endl;
+  num_clusters.close();
+  save_assignments(out_file, &(*assignments));
 
-	//heuristics
-	int new_k = merge_and_split(data, assignments, centers, lb, ub, k, dim, rng);
+  LOG(INFO) << "FINISHED CLUSTERING";
 
-	//printing
-	int counts1[new_k];
-	for (int i = 0; i < new_k; ++i) {counts1[i] = 0; }
-
-	for (int i = 0; i < assignments->size(); ++i)
-	{
-		for (int j = 0; j < p; ++j)
-		{
-			int cl = (*assignments)[i][j];
-			++counts1[cl];
-		}
-	}
-	for (int i = 0; i < new_k; ++i)
-	{
-		std::cout << i << ": " << counts1[i] << std::endl;
-	}
-	centers.destroy();
-
-	// Save the number of clusters and the assignments file
-	std::ofstream num_clusters(conf.num_clusters_filename().c_str(), std::ios::out);
-	num_clusters << new_k << std::endl;
-	num_clusters.close();
-	save_assignments(out_file, &(*assignments));
-	
-	LOG(INFO) << "FINISHED CLUSTERING";
-	
-	
-	// Build a random partition tree on the sample and save it to file
-	RandomPartitionTree<FeaID> rpt(rng, static_cast<int>(conf.dimension()),
-																 static_cast<int>(conf.n_0()), *data_rbc,
-																 *idx_dict);
-	rpt.Save(conf.rpt_filename().c_str());
+  // Build a random partition tree on the sample and save it to file
+  RandomPartitionTree<FeaID> rpt(rng, static_cast<int>(dim),
+                                 cfg.dispatch_rpt_n0, *data_rbc, *idx_dict);
+  rpt.Save(cfg.dispatch_rpt_file.c_str());
 }
 
 #else

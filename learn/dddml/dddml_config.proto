@@ -1,38 +1,53 @@
 package dddml;
 
-
 message dddmlConfig {
-	optional string data_directory = 1; // initial input data
-	optional string final_output_directory = 2; // after dispatch
-	optional string working_directory = 3; //save temps
-	optional int32 n_files = 4;
-	optional int32 n_parts_per_file = 5;
+	// Parameters describing the dataset and how to read it
+	optional string data_directory = 1;
+	optional int32  data_num_files = 2 [default = 1];
+	optional int32  data_parts_per_file = 3 [default = 1];
+	optional int32  data_num_instances = 4;
+	optional int32  data_dimension = 5;
 	optional string data_format = 6;
-	optional int32 dimension = 7; // Dimension of data
 
-	optional string sample_filename = 14; // name of file with sample.
+	// Parameters configuring the output of the experiment
+	optional string experiment_directory = 101;
+	optional string dispatch_features_file = 102 [default = "dispatch_features"];
+	optional string dispatch_sample_file = 103 [default = "dispatch_sample"];
+	optional string dispatch_assignments_file = 104 [default = "dispatch_assignments"];
+	optional string dispatch_rpt_file = 105 [default = "dispatch_rpt"];
+	optional string dispatched_directory = 106 [default = "dispatched/"];
+	optional string dispatched_num_clusters_file = 107 [default = "dispatch_num_clusters.txt"];
 
-	optional int64 seed = 15; //seed for sampling
-	///************************************
+	// Experiment Parameters:
 
-	optional int32 n_parts_to_read = 101;
-	optional int32 analysis_minibatch_size = 102;
-	optional string feature_filename = 103;
-	optional int32 n_features_to_pick = 104;
-	optional int64 total_size_of_dataset = 105;
-	optional int64 sample_size = 106; // size of sample
+	// Each script can have its own minibatch_size and num_parts, but if they are
+	// not specified, then the following defaults are used.
+	optional int32 default_minibatch_size = 1001;
+	optional int32 default_num_parts = 1002; // This is the number of parts to use
+	optional int32 default_seed = 1003;
 
-	//**************************************
+	// Analysis Parameters:
+	optional int32 analysis_minibatch_size = 1101;
+	optional int32 analysis_num_parts = 1102;
+	optional int32 analysis_num_features = 1103;
+	optional int32 analysis_seed = 1104;
 
-	optional string num_clusters_filename = 200;
-	optional int32 n_clusters = 201;
-	optional int32 replication_factor = 202;
-	optional float cluster_lower_bound = 203;
-	optional float cluster_upper_bound = 204;
-	optional string assignments_filename = 205;  //name of file with assignments
-	optional int32 n_0 = 206; // param of RPT
-	optional string rpt_filename = 207;
-	optional int32 dispatch_minibatch_size = 208; // size of mini-batches for dispatch
+	// Datasplit Parameters:
+	optional int32 datasplit_minibatch_size = 1201;
+	optional int32 datasplit_sample_size = 1202;
+	optional int32 datasplit_num_parts = 1203;
+	optional int32 datasplit_seed = 1204;
 
+	// Clustering Parameters:
+	optional int32 clustering_minibatch_size = 1301;
+	optional int32 clustering_num_clusters = 1302;
+	optional int32 clustering_replication = 1303;
+	optional float clustering_lower_capacity = 1304;
+	optional float clustering_upper_capacity = 1305;
+	optional int32 clustering_seed = 1306;
+
+	// Dispatch Parameters:
+	optional int32 dispatch_minibatch_size = 1401;
+	optional int32 dispatch_rpt_n0 = 1402;
 
 }

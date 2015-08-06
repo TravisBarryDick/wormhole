@@ -5,7 +5,6 @@
 #include "../base/localizer.h"
 #include "../base/minibatch_iter.h"
 #include "ps.h"
-#include "base/arg_parser.h"
 #include <iostream>
 #include <cstring>
 #include <algorithm>
@@ -13,7 +12,7 @@
 #include <vector>
 #include "sample_helper.h"
 
-#include "dddml_config.pb.h"
+#include "config_tools.h"
 
 namespace dddml{
 using FeaID = unsigned long long;
@@ -45,8 +44,9 @@ void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 std::vector<FeaID> *Intersect(std::vector<FeaID> *v1, std::vector<FeaID> *v2)
 {
 	// features do not exist
-	if (v1->size() == 0) return v2;
-	else if (v2->size() == 0) return v1;
+	std::cout << "v1.size = " << v1->size() << " v2.size = " << v2->size() << std::endl;
+	if (v1->size() == 0) return new std::vector<FeaID>(*v2);
+	else if (v2->size() == 0) return new std::vector<FeaID>(*v1);
 	//else:
 	std::vector<FeaID> *output = new std::vector<FeaID>();
 	for (unsigned i=0,j=0;((i < v1->size()) && (j < v2->size())); )
@@ -145,14 +145,14 @@ using real_t = dmlc::real_t;
 	/* 3.2: Get set of features to keep using localizer */
 	dmlc::Localizer <FeaID> lc;
 	std::vector<FeaID> *uidx = new std::vector<FeaID>();
-	lc.CountUniqIndex<FeaID>(sample1, uidx, NULL); 
+	lc.CountUniqIndex<FeaID>(sample1, uidx, NULL);
 	std::sort(features->begin(), features->end());
 
 	/* 3.3: intersect uidx with features */
 	std::vector<FeaID> *idx_dict = Intersect(features, uidx);
-	
+
 	std::cout << "DEBUGGING: features->size() = " << features->size()
-						<< " uidx->size() = " << uidx->size() 
+						<< " uidx->size() = " << uidx->size()
 						<< " intersection->size() = " << idx_dict->size() << std::endl;
 
 	//std::cout << "DEBUGGING1: ";
@@ -193,42 +193,13 @@ App* App::Create(int argc, char *argv[]) {
 }
 }  // namespace ps
 
-
-int main(int argc, char *argv[])
-{
-	using namespace dddml;
-	ArgParser parser;
-	if (argc > 1 && strcmp(argv[1], "none")) parser.ReadFile(argv[1]);
-	parser.ReadArgs(argc - 2, argv + 2);
-	dddmlConfig conf;
-	parser.ParseToProto(&conf);
-
-	#if 0
-	char featureFile[] = "features.txt";
-	char data_directory[] = "../data/mnist";
-	char outputFile[] = "../data/mnist.out";
-	char data_format[] = "libsvm";
-	int subsample_size = 10000;
-	int total_size = 60000;
-	#endif
-
-	const char *featureFile = conf.feature_filename().c_str();
-	const char *data_directory = conf.data_directory().c_str();
-	const char *outputFile = conf.sample_filename().c_str();
-	const char *data_format = conf.data_format().c_str();
-	int subsample_size = conf.sample_size();
-	int total_size = conf.total_size_of_dataset();
-	//std::cout << subsample_size << " " << total_size << " " << featureFile << std::endl;
-
-	//int nfile = conf.n_files(),
-
-	std::random_device rd;
-	int seed = conf.seed();
-    std::mt19937_64 rng (rd());
-
-	subsample(featureFile, data_directory, outputFile,data_format, subsample_size, total_size, rng,
-			conf.n_files(), conf.n_parts_per_file(), conf.n_parts_to_read(), conf.analysis_minibatch_size());
-
-
-	return 0;
+int main(int argc, char *argv[]) {
+  using namespace dddml;
+  ConfigWrapper cfg(argv[1]);
+  std::mt19937_64 rng(cfg.datasplit_seed);
+  subsample(cfg.dispatch_features_file.c_str(), cfg.data_directory.c_str(),
+            cfg.dispatch_sample_file.c_str(), cfg.data_format.c_str(),
+            cfg.datasplit_sample_size, cfg.data_num_instances, rng,
+            cfg.data_num_files, cfg.datasplit_num_parts,
+            cfg.datasplit_num_parts, cfg.datasplit_minibatch_size);
 }

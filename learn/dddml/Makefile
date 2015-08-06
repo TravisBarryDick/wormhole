@@ -10,7 +10,6 @@ clean:
 
 bin: build/datasplit build/analyze_dataset build/kmeans build/dispatcher
 
-
 build/%.o: %.cc
 	@mkdir -p $(@D)
 	$(CXX) $(CFLAGS) -MM -MT build/$*.o $< >build/$*.d
@@ -22,7 +21,7 @@ build/%.o: %.cc
 build/datasplit: build/dddml_config.pb.o build/datasplit.o  $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
-build/trial: build/dddml_config.pb.o build/trial.o $(DMLC_SLIB) 
+build/trial: build/dddml_config.pb.o build/trial.o $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 build/dispatcher: build/dddml_config.pb.o build/dispatcher.o $(DMLC_SLIB)
@@ -30,7 +29,6 @@ build/dispatcher: build/dddml_config.pb.o build/dispatcher.o $(DMLC_SLIB)
 
 build/analyze_dataset: build/dddml_config.pb.o build/analyze_dataset.o $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
-
 
 build/kmeans: build/dddml_config.pb.o build/kmeans.o  $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
