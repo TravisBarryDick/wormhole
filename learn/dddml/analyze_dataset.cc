@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     for (int part = 0; part < cfg.analysis_num_parts(); ++part) {
       int partID = part_dist(rng);
 
-      string filename = cfg.get_data_filename(fi);
+      string filename = cfg.data_path(fi);
       MinibatchIter<FeaID> reader(filename.c_str(), partID,
                                   cfg.data_parts_per_file(), cfg.data_format().c_str(),
                                   cfg.analysis_minibatch_size());

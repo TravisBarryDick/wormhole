@@ -9,6 +9,9 @@ message dddmlConfig {
 	optional int32  data_dimension = 5;
 	optional string data_format = 6;
 
+	optional string train_directory = 7 [default = "train/"];
+	optional string test_directory = 8 [default = "test/"];
+
 	// Parameters configuring the output of the experiment
 	optional string experiment_directory = 101;
 	optional string dispatch_features_file = 102 [default = "dispatch_features"];

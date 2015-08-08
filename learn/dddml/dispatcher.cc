@@ -1,3 +1,4 @@
+#include <iostream>
 #include <sstream>
 
 #include "dmlc/data.h"
@@ -23,6 +24,16 @@ int CreateServerNode(int argc, char* argv[]) { return 0; }
 
 int WorkerNodeMain(int argc, char* argv[]) {
   SmartDDDMLConfig cfg = dddml::load_config(argv[1]);
+
+  bool is_test;
+  if (argc < 3 || !strcmp(argv[2], "train")) {
+    is_test = false;
+  } else if (!strcmp(argv[2], "test")) {
+    is_test = true;
+  } else {
+    cerr << "Second argument must be either \"test\" or \"train\". Default is "
+            "train.\n";
+  }
 
   // Load the dispatching data and the dispatch tree
   RandomPartitionTree<FeaID> rpt(cfg.dispatch_sample_path().c_str(),
@@ -55,16 +66,17 @@ int WorkerNodeMain(int argc, char* argv[]) {
   cluster_writers.reserve(k);
   for (size_t i = 0; i < k; ++i) {
     stringstream filename;
-    filename << cfg.dispatched_path() << i << "/" << MyRank();
+    filename << cfg.dispatched_path(i, is_test) << MyRank();
     string filename_str = filename.str();
     cluster_writers.push_back(BufferedWriter<FeaID>(filename_str.c_str()));
   }
 
   for (int file_num = 0; file_num < cfg.data_num_files(); ++file_num) {
-    string filename = cfg.get_data_filename(file_num);
+    string filename = cfg.data_path(file_num, is_test);
     for (size_t part = first_part; part < first_part + num_parts; ++part) {
       MinibatchIter<FeaID> reader(
-          filename.c_str(), part, static_cast<size_t>(cfg.data_parts_per_file()),
+          filename.c_str(), part,
+          static_cast<size_t>(cfg.data_parts_per_file()),
           cfg.data_format().c_str(), cfg.dispatch_minibatch_size());
       reader.BeforeFirst();
       while (reader.Next()) {

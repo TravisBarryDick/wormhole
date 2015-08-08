@@ -42,10 +42,6 @@ class SmartDDDMLConfig : public dddmlConfig {
     return strjoin(experiment_directory(), dispatch_rpt_file());
   }
 
-  std::string dispatched_path() const {
-    return strjoin(experiment_directory(), dispatched_directory());
-  }
-
   std::string dispatched_num_clusters_path() const {
     return strjoin(experiment_directory(), dispatched_num_clusters_file());
   }
@@ -65,9 +61,27 @@ class SmartDDDMLConfig : public dddmlConfig {
     return clustering_seed();
   }
 
-  std::string get_data_filename(int part) {
+  std::string data_path(bool is_test = false) const {
+    return strjoin(data_directory(),
+                   is_test ? test_directory() : train_directory());
+  }
+
+  std::string data_path(int number, bool is_test) const {
     std::stringstream buffer;
-    buffer << data_directory() << part;
+    buffer << data_path(is_test) << number;
+    return buffer.str();
+  }
+
+  std::string dispatched_path(bool is_test = false) const {
+    std::stringstream buffer;
+    buffer << experiment_directory() << dispatched_directory()
+           << (is_test ? test_directory() : train_directory());
+    return buffer.str();
+  }
+
+  std::string dispatched_path(int cluster, bool is_test = false) const {
+    std::stringstream buffer;
+    buffer << dispatched_path(is_test) << cluster << "/";
     return buffer.str();
   }
 };
