@@ -195,11 +195,11 @@ App* App::Create(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
   using namespace dddml;
-  ConfigWrapper cfg(argv[1]);
-  std::mt19937_64 rng(cfg.datasplit_seed);
-  subsample(cfg.dispatch_features_file.c_str(), cfg.data_directory.c_str(),
-            cfg.dispatch_sample_file.c_str(), cfg.data_format.c_str(),
-            cfg.datasplit_sample_size, cfg.data_num_instances, rng,
-            cfg.data_num_files, cfg.datasplit_num_parts,
-            cfg.datasplit_num_parts, cfg.datasplit_minibatch_size);
+	SmartDDDMLConfig cfg = dddml::load_config(argv[1]);
+  std::mt19937_64 rng(cfg.safe_datasplit_seed());
+  subsample(cfg.dispatch_features_path().c_str(), cfg.data_directory().c_str(),
+            cfg.dispatch_sample_path().c_str(), cfg.data_format().c_str(),
+            cfg.datasplit_sample_size(), cfg.data_num_instances(), rng,
+            cfg.data_num_files(), cfg.datasplit_num_parts(),
+            cfg.datasplit_num_parts(), cfg.datasplit_minibatch_size());
 }

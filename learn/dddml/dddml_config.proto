@@ -20,12 +20,6 @@ message dddmlConfig {
 
 	// Experiment Parameters:
 
-	// Each script can have its own minibatch_size and num_parts, but if they are
-	// not specified, then the following defaults are used.
-	optional int32 default_minibatch_size = 1001;
-	optional int32 default_num_parts = 1002; // This is the number of parts to use
-	optional int32 default_seed = 1003;
-
 	// Analysis Parameters:
 	optional int32 analysis_minibatch_size = 1101;
 	optional int32 analysis_num_parts = 1102;

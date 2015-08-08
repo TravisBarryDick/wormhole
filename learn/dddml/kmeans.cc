@@ -428,17 +428,15 @@ int main(int argc, char *argv[]) {
   using namespace std;
   using namespace dmlc;
 
-  ConfigWrapper cfg(argv[1]);
+	SmartDDDMLConfig cfg = dddml::load_config(argv[1]);
 
-  std::mt19937_64 rng(cfg.clustering_seed);
-  int k = cfg.clustering_num_clusters;
-  int p = cfg.clustering_replication;
-  real_t lfrac = cfg.clustering_lower_capacity;
-  real_t Lfrac = cfg.clustering_upper_capacity;
-  const char *data_file = cfg.dispatch_sample_file.c_str();
-  const char *out_file = cfg.dispatch_assignments_file.c_str();
+  std::mt19937_64 rng(cfg.safe_clustering_seed());
+  int k = cfg.clustering_num_clusters();
+  int p = cfg.clustering_replication();
+  real_t lfrac = cfg.clustering_lower_capacity();
+  real_t Lfrac = cfg.clustering_upper_capacity();
 
-  auto readpair = readSamplingOutput(cfg.dispatch_sample_file.c_str());
+  auto readpair = readSamplingOutput(cfg.dispatch_sample_path().c_str());
   auto idx_dict = readpair.first;
   int dim = idx_dict->size();  // dim = size of idx_dict
   dmlc::data::RowBlockContainer<FeaID> *data_rbc =
@@ -491,18 +489,18 @@ int main(int argc, char *argv[]) {
   centers.destroy();
 
   // Save the number of clusters and the assignments file
-  std::ofstream num_clusters(cfg.dispatched_num_clusters_file.c_str(),
+  std::ofstream num_clusters(cfg.dispatched_num_clusters_path().c_str(),
                              std::ios::out);
   num_clusters << new_k << std::endl;
   num_clusters.close();
-  save_assignments(out_file, &(*assignments));
+  save_assignments(cfg.dispatch_assignments_path().c_str(), &(*assignments));
 
   LOG(INFO) << "FINISHED CLUSTERING";
 
   // Build a random partition tree on the sample and save it to file
   RandomPartitionTree<FeaID> rpt(rng, static_cast<int>(dim),
-                                 cfg.dispatch_rpt_n0, *data_rbc, *idx_dict);
-  rpt.Save(cfg.dispatch_rpt_file.c_str());
+                                 cfg.dispatch_rpt_n0(), *data_rbc, *idx_dict);
+  rpt.Save(cfg.dispatch_rpt_path().c_str());
 }
 
 #else
