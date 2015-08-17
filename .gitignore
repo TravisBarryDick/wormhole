@@ -46,3 +46,5 @@ deps
 bin
 tracker
 *.d
+
+doc

@@ -16,7 +16,7 @@ REPOS = $(addprefix repo/, dmlc-core xgboost ps-lite rabit)
 
 .PHONY: clean all test pull
 
-all: xgboost kmeans linear fm bin/text2crb.dmlc
+all: xgboost kmeans linear difacto tool
 
 ### repos and deps
 
@@ -89,19 +89,29 @@ bin/linear.dmlc: learn/linear/build/linear.dmlc
 linear: bin/linear.dmlc
 
 # FM
-learn/difacto/build/fm.dmlc: ps-lite core repo/ps-lite/build/libps.a repo/dmlc-core/libdmlc.a
+learn/difacto/build/difacto.dmlc: ps-lite core repo/ps-lite/build/libps.a repo/dmlc-core/libdmlc.a
 	$(MAKE) -C learn/difacto config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
 
-bin/fm.dmlc: learn/difacto/build/fm.dmlc
+bin/difacto.dmlc: learn/difacto/build/difacto.dmlc
 	cp $+ $@
 
-fm: bin/fm.dmlc
+difacto: bin/difacto.dmlc
 
 # tools
 
-bin/text2crb.dmlc:
-	$(MAKE) -C learn/tool text2crb config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
-	cp learn/tool/text2crb $@
+bin/convert.dmlc:
+	$(MAKE) -C learn/tool convert config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
+	cp learn/tool/convert $@
+
+tool: bin/convert.dmlc
+
+# test
+include learn/test/build.mk
+
+learn/test/%: ps-lite core repo/ps-lite/build/libps.a repo/dmlc-core/libdmlc.a
+	$(MAKE) -C learn/test $* config=$(config) DEPS_PATH=$(DEPS_PATH) CXX=$(CXX)
+
+test: $(addprefix learn/test/, $(TEST))
 
 
 pull:

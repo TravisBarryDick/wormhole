@@ -85,7 +85,6 @@ class MinibatchIter {
           // no random shuffle
           if (!parser_->Next()) break;
           in_blk_ = parser_->Value();
-
         } else {
           // do random shuffle
           if (!buf_reader_->Next()) break;
@@ -116,7 +115,13 @@ class MinibatchIter {
       }
       start_ += len;
     }
+
+    bool binary =  true;
+    for (auto f : mb_.value) if (f != 1) { binary = false; break; }
+    if (binary) mb_.value.clear();
+
     out_blk_ = mb_.GetBlock();
+
     return out_blk_.size > 0;
   }
 

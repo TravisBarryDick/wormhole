@@ -1,0 +1,1 @@
+TEST=build/data_parallel_test build/iter_solver_test
