@@ -61,6 +61,10 @@ class SmartDDDMLConfig : public dddmlConfig {
     return clustering_seed();
   }
 
+  std::string model_path() const {
+    return strjoin(experiment_directory(), model_directory());
+  }
+  
   std::string data_path(bool is_test = false) const {
     return strjoin(data_directory(),
                    is_test ? test_directory() : train_directory());
@@ -78,6 +82,14 @@ class SmartDDDMLConfig : public dddmlConfig {
            << (is_test ? test_directory() : train_directory());
     return buffer.str();
   }
+  
+  std::string predictions_path() const {
+    std::stringstream buffer;
+    buffer << experiment_directory() << dispatched_directory()
+           << prediction_directory();
+    return buffer.str();
+  }
+
 
   std::string dispatched_path(int cluster, bool is_test = false) const {
     std::stringstream buffer;
@@ -93,4 +105,4 @@ SmartDDDMLConfig load_config(const std::string& filename) {
   parser.ParseToProto(&cfg);
   return cfg;
 }
-};
+}; //namespace dddml

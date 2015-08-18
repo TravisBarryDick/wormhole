@@ -8,7 +8,7 @@ all: bin # tool # test
 clean:
 	rm -rf build/*
 
-bin: build/datasplit build/analyze_dataset build/kmeans build/dispatcher
+bin: build/datasplit build/analyze_dataset build/kmeans build/dispatcher build/learn
 
 build/%.o: %.cc
 	@mkdir -p $(@D)
@@ -32,5 +32,9 @@ build/analyze_dataset: build/dddml_config.pb.o build/analyze_dataset.o $(DMLC_SL
 
 build/kmeans: build/dddml_config.pb.o build/kmeans.o  $(DMLC_SLIB)
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
+
+build/learn: build/dddml_config.pb.o build/learn.o  $(DMLC_SLIB)
+	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
+
 
 -include build/*.d

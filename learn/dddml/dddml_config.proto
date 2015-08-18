@@ -20,6 +20,8 @@ message dddmlConfig {
 	optional string dispatch_rpt_file = 105 [default = "dispatch_rpt"];
 	optional string dispatched_directory = 106 [default = "dispatched/"];
 	optional string dispatched_num_clusters_file = 107 [default = "dispatch_num_clusters.txt"];
+	optional string model_directory = 108 [default = "model/"];
+	optional string prediction_directory = 109 [default = "predictions/"]; //dispatched/predictions;
 
 	// Experiment Parameters:
 
