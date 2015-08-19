@@ -52,9 +52,9 @@ int main(int argc, char *argv[]) {
   }
 
   std::string conf_filename ("temp_LEARN.conf");
-  std::string script_command ("tracker/dmlc_local.py"); //TODO
+  std::string script_command ("../../tracker/dmlc_local.py"); //TODO
   std::stringstream sss;
-  sss << script_command << " -n 1 -s 1 bin.linear.dmlc " << conf_filename;
+  sss << script_command << " -n 1 -s 1 ../../bin/linear.dmlc " << conf_filename;
   std::string command = sss.str();
   //std::string command ("tracker/dmlc_local.py -n 1 -s 1 bin/linear.dmlc <conf_file>"); //TODO
   
