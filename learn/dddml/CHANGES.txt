@@ -2,3 +2,4 @@
 2. Modify SDot in dmlc/data.h to return inner product
 3. Fix order of reading/writing rbc.index and rbc.value in Stream::Read(std::vector<I> *) and Stream::Write(std::vector<I> &) in dlmc-core/src/data/row_block.h
 4. Include "gflags/gflags.h" in localizer.h.
+5. To get tracker/dmlc_mpi.py to work on bros, need to comment line 52 and uncomment line 54.
