@@ -3,7 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include "ps.h"
+//#include "ps.h"
 
 void create_training_conf(std::string config_filename, std::string train_data, std::string model_file, int machine_id){
   //write these to file
@@ -26,13 +26,13 @@ void create_testing_conf(std::string config_filename, std::string val_data, std:
   out1.close();
 }
 
-
+/*
 namespace ps {
 App* App::Create(int argc, char *argv[]) {
   return NULL;
 }
 }  // namespace ps
-
+*/
 
 
 int main(int argc, char *argv[]) {
@@ -56,7 +56,6 @@ int main(int argc, char *argv[]) {
   std::stringstream sss;
   sss << script_command << " -n 1 -s 1 ../../bin/linear.dmlc " << conf_filename;
   std::string command = sss.str();
-  //std::string command ("tracker/dmlc_local.py -n 1 -s 1 bin/linear.dmlc <conf_file>"); //TODO
   
   if (train_or_test.compare("train") == 0)
   {
@@ -95,7 +94,7 @@ int main(int argc, char *argv[]) {
     	//create conf file
     	create_testing_conf(conf_filename, val_file, pred_directory, cfg.model_path(), machine_id);
     	//run command
-  		std::system(command.c_str()); 
+  	std::system(command.c_str()); 
     	//std::cout << (command) << std::endl; 
   	}
   }

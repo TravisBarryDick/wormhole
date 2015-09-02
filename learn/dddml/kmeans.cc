@@ -428,7 +428,12 @@ int main(int argc, char *argv[]) {
   using namespace std;
   using namespace dmlc;
 
-	SmartDDDMLConfig cfg = dddml::load_config(argv[1]);
+  if (argc < 2)
+  {
+    std::cerr << "Insufficient arguments. Aborting." << std::endl;
+    return 0;
+  }
+  SmartDDDMLConfig cfg = dddml::load_config(argv[1]);
 
   std::mt19937_64 rng(cfg.safe_clustering_seed());
   int k = cfg.clustering_num_clusters();
@@ -489,10 +494,15 @@ int main(int argc, char *argv[]) {
   centers.destroy();
 
   // Save the number of clusters and the assignments file
-  std::ofstream num_clusters(cfg.dispatched_num_clusters_path().c_str(),
-                             std::ios::out);
-  num_clusters << new_k << std::endl;
-  num_clusters.close();
+  //std::ofstream num_clusters(cfg.dispatched_num_clusters_path().c_str(),
+  //                           std::ios::out);
+  //num_clusters << new_k << std::endl;
+  //num_clusters.close();
+  
+  Stream *num_clusters_out = Stream::Create(cfg.dispatched_num_clusters_path().c_str(), "w"); 
+  num_clusters_out->Write(&new_k, sizeof(int));
+  delete num_clusters_out;
+
   save_assignments(cfg.dispatch_assignments_path().c_str(), &(*assignments));
 
   LOG(INFO) << "FINISHED CLUSTERING";
@@ -501,6 +511,7 @@ int main(int argc, char *argv[]) {
   RandomPartitionTree<FeaID> rpt(rng, static_cast<int>(dim),
                                  cfg.dispatch_rpt_n0(), *data_rbc, *idx_dict);
   rpt.Save(cfg.dispatch_rpt_path().c_str());
+  LOG(INFO) << "Building RPT";
 }
 
 #else

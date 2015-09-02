@@ -32,10 +32,12 @@ void output (std::unordered_map<FeaID, size_t> &counts)
   {
     mm.insert(make_pair(it->second, it->first));
   }
+  /*
   for (auto it = mm.rbegin(); it != mm.rend(); ++it)
-	{
-	  cout << it->second << " " << it->first << endl;
-	}
+  { 
+    cout << it->second << " " << it->first << endl;
+  }
+  */
 }
 
 void output(std::unordered_map<FeaID, size_t> &counts, int maxc, std::string featureFile)
@@ -54,7 +56,7 @@ void output(std::unordered_map<FeaID, size_t> &counts, int maxc, std::string fea
 	    topFeatures.push_back(it->second);
 	    ++i;
 	  }
-	  cout << it->second << " " << it->first << endl;
+	  //cout << it->second << " " << it->first << endl;
 	}
 	dmlc::Stream *file = dmlc::Stream::Create(featureFile.c_str(), "w");
 	file->Write(topFeatures);
@@ -62,6 +64,9 @@ void output(std::unordered_map<FeaID, size_t> &counts, int maxc, std::string fea
 }
 
 int main(int argc, char *argv[]) {
+  if (argc < 2){
+    std::cerr << "Give conf file as argument. Aborting.. " << std::endl; return 0;
+  }
   // Read configuration file
   SmartDDDMLConfig cfg = dddml::load_config(argv[1]);
   // Make a random number generator with the given seend
@@ -74,12 +79,13 @@ int main(int argc, char *argv[]) {
   dmlc::data::RowBlockContainer<FeaID> sample;
   dmlc::data::RowBlockContainer<FeaID> *sample_compressed =
       new dmlc::data::RowBlockContainer<FeaID>();
-
+  unsigned long long count_features = 0;
   for (int fi = 0; fi < cfg.data_num_files(); ++fi) {
     for (int part = 0; part < cfg.analysis_num_parts(); ++part) {
       int partID = part_dist(rng);
 
       string filename = cfg.data_path(fi);
+      std::cout << "Data directory: " << filename << std::endl;
       MinibatchIter<FeaID> reader(filename.c_str(), partID,
                                   cfg.data_parts_per_file(), cfg.data_format().c_str(),
                                   cfg.analysis_minibatch_size());
@@ -94,11 +100,14 @@ int main(int argc, char *argv[]) {
           if (counts.count(uidx[i])) {  // element exists in map
             counts[uidx[i]] += freq[i];
           } else {  // element does not exist
+            ++count_features;
             counts[uidx[i]] = freq[i];
           }
         }
       }
     }
   }
+  std::cout << "Found " << count_features << " unique features" << std::endl;
   output(counts, cfg.analysis_num_features(), cfg.dispatch_features_path());
+  std::cout << "Analysis complete! Output " << cfg.analysis_num_features() << " features." << std::endl;
 }

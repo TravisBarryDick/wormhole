@@ -3,7 +3,8 @@ package dddml;
 message dddmlConfig {
 	// Parameters describing the dataset and how to read it
 	optional string data_directory = 1;
-	optional int32  data_num_files = 2 [default = 1];
+	optional int32  data_num_files = 2 [default = 1]; // for training and datasplit
+	optional int32  data_num_files_test = 11 [default = 1]; //for testing
 	optional int32  data_parts_per_file = 3 [default = 1];
 	optional int32  data_num_instances = 4;
 	optional int32  data_dimension = 5;

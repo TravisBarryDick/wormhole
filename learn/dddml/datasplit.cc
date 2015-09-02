@@ -44,7 +44,6 @@ void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 std::vector<FeaID> *Intersect(std::vector<FeaID> *v1, std::vector<FeaID> *v2)
 {
 	// features do not exist
-	std::cout << "v1.size = " << v1->size() << " v2.size = " << v2->size() << std::endl;
 	if (v1->size() == 0) return new std::vector<FeaID>(*v2);
 	else if (v2->size() == 0) return new std::vector<FeaID>(*v1);
 	//else:
@@ -84,6 +83,10 @@ void subsample(
 {
 using real_t = dmlc::real_t;
 
+std::cout << "feature file: "<< featureFile << std::endl;
+std::cout << "data dir: " << data_directory << std::endl;
+std::cout << "output file: " << outputFile << std::endl;
+
 	/* Step 1: Figure out number of files */
 	int /*nFiles = 1,
 		nPartPerFile = 100,
@@ -110,7 +113,6 @@ using real_t = dmlc::real_t;
 		for (int part = 0; part < nPartToRead; ++part)
 		{
 			partID = dis(rng) ;
-			std::cout << "DEBUGGING: new part: " << partID << std::endl;
 			//TODO: verify filename
 			char filename[200];
 			std::sprintf(filename, "%s/%d", data_directory, fi);
@@ -122,7 +124,6 @@ using real_t = dmlc::real_t;
 			reader.BeforeFirst();
 			while (reader.Next()) {
 				auto mb = reader.Value(); //row block
-				std::cout << "DEBUGGING: read a row block " << std::endl;
 				for (size_t i = 0; i < mb.size; ++i)
 				{
 					//decide whether to add row mb[i] to the sample or not
@@ -195,7 +196,10 @@ App* App::Create(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
   using namespace dddml;
-	SmartDDDMLConfig cfg = dddml::load_config(argv[1]);
+    if (argc < 2){
+    std::cerr << "Give conf file as argument. Aborting.. " << std::endl; return 0;
+  }
+  SmartDDDMLConfig cfg = dddml::load_config(argv[1]);
   std::mt19937_64 rng(cfg.safe_datasplit_seed());
   subsample(cfg.dispatch_features_path().c_str(), cfg.data_path().c_str(),
             cfg.dispatch_sample_path().c_str(), cfg.data_format().c_str(),

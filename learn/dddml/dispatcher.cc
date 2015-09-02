@@ -57,9 +57,12 @@ int WorkerNodeMain(int argc, char* argv[]) {
 
   // Read the number of clusters
   int k;
-  ifstream num_clusters(cfg.dispatched_num_clusters_path(), ios::in);
-  num_clusters >> k;
-  num_clusters.close();
+  //ifstream num_clusters(cfg.dispatched_num_clusters_path(), ios::in);
+  //num_clusters >> k;
+  //num_clusters.close();
+  Stream *num_clusters = dmlc::Stream::Create(cfg.dispatched_num_clusters_path().c_str(), "r");
+  num_clusters->Read(&k, sizeof(int)); //note:type is int
+  delete num_clusters;  
 
   // Make a BufferedWriter for each cluster
   vector<BufferedWriter<FeaID>> cluster_writers;
@@ -70,8 +73,9 @@ int WorkerNodeMain(int argc, char* argv[]) {
     string filename_str = filename.str();
     cluster_writers.push_back(BufferedWriter<FeaID>(filename_str.c_str()));
   }
-
-  for (int file_num = 0; file_num < cfg.data_num_files(); ++file_num) {
+  unsigned long long count_processed = 0;  
+  //actual dispatch
+  for (int file_num = 0; file_num < (is_test? cfg.data_num_files_test() :cfg.data_num_files()); ++file_num) {
     string filename = cfg.data_path(file_num, is_test);
     for (size_t part = first_part; part < first_part + num_parts; ++part) {
       MinibatchIter<FeaID> reader(
@@ -83,6 +87,11 @@ int WorkerNodeMain(int argc, char* argv[]) {
         auto mb = reader.Value();
         for (size_t i = 0; i < mb.size; ++i) {
           size_t nn_idx = rpt.find_nn(mb[i]);
+          ++count_processed;
+          if (count_processed % 10000 == 0)
+          {
+            std::cout << "Worker " << MyRank() << " processed " << count_processed << " examples" << std::endl;
+          }
           for (auto cluster_ix : assignments[nn_idx]) {
             cluster_writers[cluster_ix].Write(mb[i]);
           }
@@ -90,5 +99,6 @@ int WorkerNodeMain(int argc, char* argv[]) {
       }
     }
   }
+  std::cout << "Worker " << MyRank() << " finished. Processed " << count_processed << " examples" << std::endl;
   for (auto cw : cluster_writers) cw.Flush();
 }
