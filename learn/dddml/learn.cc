@@ -43,8 +43,7 @@ App* App::Create(int argc, char *argv[]) {
 int main(int argc, char *argv[])
 {
   if (argc < 4) {
-    std::
-      cout << "The Correct usage is: " << argv[0] <<
+    std::cout << "The Correct usage is: " << argv[0] <<
       " <config_file> <train_or_test> <machine_id> [num_parts{for test only}]"
       << std::endl;
     return 0;
@@ -55,8 +54,7 @@ int main(int argc, char *argv[])
   int machine_id;
   bool temp = (iss >> machine_id);
   if (!temp) {
-    std::
-      cout << "The Correct usage is: " << argv[0] <<
+    std::cout << "The Correct usage is: " << argv[0] <<
       "<config_file> <train_or_test> <machine_id> [num_parts{for test only}]" <<
       std::endl;
     return 0;
@@ -77,31 +75,27 @@ int main(int argc, char *argv[])
     std::system(command.c_str());
     //std::cout << (command) << std::endl; 
 
-  } else { // testing
+  } else {                      // testing
     std::cout << "testing file" << std::endl;
-    if (argc < 5) {
-      std::
-        cout << "The Correct usage is: " << argv[0] <<
-        "<config_file> <train_or_test> <machine_id> [num_parts{for test only}]"
-        << std::endl;
-      return 0;
-    }
-    std::istringstream iss1(argv[4]);
     int num_parts;
-    temp = (iss1 >> num_parts);
-    if (!temp) {
-      std::
-        cout << "The Correct usage is: " << argv[0] <<
-        "<config_file> <train_or_test> <machine_id> [num_parts{for test only}]"
-        << std::endl;
-      return 0;
+    if (argc < 5) {
+      num_parts = 1;
+    } else {
+      std::istringstream iss1(argv[4]);
+      temp = (iss1 >> num_parts);
+      if (!temp) {
+        std::cout << "The Correct usage is: " << argv[0] <<
+          "<config_file> <train_or_test> <machine_id> [num_parts{for test only}]"
+          << std::endl;
+        return 0;
+      }
     }
     // one for each testing part:
     for (int i = 0; i < num_parts; ++i) {
       std::ostringstream oss, oss1;
       oss << cfg.predictions_path() << i;
       auto pred_directory = oss.str();
-      oss1 << cfg.dispatched_path(machine_id, true) << i; // true gives testing path
+      oss1 << cfg.dispatched_path(machine_id, true) << i;       // true gives testing path
       auto val_file = oss1.str();
       //create conf file
       create_testing_conf(conf_filename, val_file, pred_directory,
