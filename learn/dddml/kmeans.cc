@@ -423,6 +423,10 @@ myPair readSamplingOutput(const char *filename)
 	return myPair(idx, data);
 }
 
+/* Main function:
+ * 	Make sure to return the final number of clusters. 
+ * 	More scripts depend on this.
+ */ 
 int main(int argc, char *argv[]) {
   using namespace dddml;
   using namespace std;
@@ -512,6 +516,7 @@ int main(int argc, char *argv[]) {
                                  cfg.dispatch_rpt_n0(), *data_rbc, *idx_dict);
   rpt.Save(cfg.dispatch_rpt_path().c_str());
   LOG(INFO) << "Building RPT";
+  return new_k;
 }
 
 #else

@@ -28,6 +28,7 @@ int WorkerNodeMain(int argc, char* argv[]) {
   bool is_test;
   if (argc < 3 || !strcmp(argv[2], "train")) {
     is_test = false;
+    if (argc < 3) cerr << "Dispatching training file, by default.\n";
   } else if (!strcmp(argv[2], "test")) {
     is_test = true;
   } else {

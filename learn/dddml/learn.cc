@@ -5,15 +5,16 @@
 #include <string>
 //#include "ps.h"
 
+
 void create_training_conf(std::string config_filename, std::string train_data,
                           std::string model_file, int machine_id)
 {
   //write these to file
-  //TODO:check double quotes of output:
   std::ofstream out1(config_filename, std::ofstream::out);
   out1 << "train_data = \"" << train_data << "\"\n";
   out1 << "model_out = \"" << model_file << machine_id << "\"\n";
   out1 << "data_format = \"RowBlockContainer\"\n";
+  out1 << "num_parts_per_file = 1\n"; //TODO
   out1.close();
 }
 
@@ -22,12 +23,12 @@ void create_testing_conf(std::string config_filename, std::string val_data,
                          int machine_id)
 {
   //write these to file
-  //TODO:check double quotes of output:
   std::ofstream out1(config_filename, std::ofstream::out);
   out1 << "val_data = \"" << val_data << "\"\n";
   out1 << "model_in = \"" << model_file << machine_id << "\"\n";
   out1 << "data_format = \"RowBlockContainer\"\n";
   out1 << "predict_out = \"" << pred_file << "\"\n";
+  out1 << "num_parts_per_file = 1\n"; //TODO
   out1.close();
 }
 
@@ -75,7 +76,7 @@ int main(int argc, char *argv[])
     std::system(command.c_str());
     //std::cout << (command) << std::endl; 
 
-  } else {                      // testing
+  } else if (train_or_test.compare("test") == 0) {                      // testing
     std::cout << "testing file" << std::endl;
     int num_parts;
     if (argc < 5) {
@@ -93,20 +94,21 @@ int main(int argc, char *argv[])
     // one for each testing part:
     for (int i = 0; i < num_parts; ++i) {
       std::ostringstream oss, oss1;
-      oss << cfg.predictions_path() << i;
+      oss << cfg.predictions_path() << machine_id << "/"; 
       auto pred_directory = oss.str();
-      oss1 << cfg.dispatched_path(machine_id, true) << i;       // true gives testing path
+      std::cerr << "**********************pred_path: " << pred_directory << std::endl;
+      oss1 << cfg.dispatched_path(machine_id, true) << i;       // is_test=true gives testing path
       auto val_file = oss1.str();
+      std::cerr << val_file << std::endl;
       //create conf file
       create_testing_conf(conf_filename, val_file, pred_directory,
                           cfg.model_path(), machine_id);
       //run command
-      std::system(command.c_str());
+      std::system((command + " > /dev/null 2>&1").c_str());
       //std::cout << (command) << std::endl; 
     }
-  }
+  } 
   std::stringstream ss_o;
   ss_o << "rm " << conf_filename;
   std::system(ss_o.str().c_str());
-
 }
