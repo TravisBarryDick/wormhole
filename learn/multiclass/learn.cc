@@ -156,6 +156,8 @@ int main(int argc, char *argv[]) {
   create_training_config(new_train_conf, train_config_file, new_train_file);
   for(int i = 0; i < 10; ++i)
   {
+    std::cout << "****************\nStarting " << i << "\n*******************" << std::endl;
+    std::system("rm model*");
     //create new train and test files
     convert_to_binary_class(train_file, new_train_file, i);
     //convert_to_binary_class(test_file, new_test_file, i);
@@ -170,7 +172,10 @@ int main(int argc, char *argv[]) {
     std::cout << test_command << std::endl;
     std::system(train_command.c_str());
     std::system(test_command.c_str());
-    return 0;
+    char cmd[200];
+    std::sprintf(cmd, "cat pred_%dt* > pred_%d; rm pred_%dt*", i, i,i);
+    std::system(cmd);
+    //return 0;
   }
   //combine predictions
   std::string final_predictions = (pred_file + "final");
@@ -178,7 +183,7 @@ int main(int argc, char *argv[]) {
   
   //evaluate accuracy
   float accuracy = eval_accuracy(final_predictions, test_file);  
-  
+  std::cout << "accuracy: " << accuracy << std::endl;  
 }
 
 
