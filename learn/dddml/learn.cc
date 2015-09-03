@@ -22,7 +22,7 @@ void create_testing_conf(std::string config_filename, std::string val_data, std:
   out1 << "val_data = \"" << val_data << "\"\n"; 
   out1 << "model_in = \"" << model_file << machine_id << "\"\n";
   out1 << "data_format = \"RowBlockContainer\"\n";
-  out1 << "pred_out = \"" << pred_file << "\"\n";
+  out1 << "predict_out = \"" << pred_file << "\"\n";
   out1.close();
 }
 
@@ -52,9 +52,9 @@ int main(int argc, char *argv[]) {
   }
 
   std::string conf_filename ("temp_LEARN.conf");
-  std::string script_command ("../../tracker/dmlc_local.py"); //TODO
+  std::string script_command ("/home/vpillutl/wormhole/wormhole/tracker/dmlc_local.py"); //TODO
   std::stringstream sss;
-  sss << script_command << " -n 1 -s 1 ../../bin/linear.dmlc " << conf_filename;
+  sss << script_command << " -n 1 -s 1 /home/vpillutl/wormhole/wormhole/bin/linear.dmlc " << conf_filename;
   std::string command = sss.str();
   
   if (train_or_test.compare("train") == 0)
