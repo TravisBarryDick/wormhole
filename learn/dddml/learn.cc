@@ -14,7 +14,7 @@ void create_training_conf(std::string config_filename, std::string train_data,
   out1 << "train_data = \"" << train_data << "\"\n";
   out1 << "model_out = \"" << model_file << machine_id << "\"\n";
   out1 << "data_format = \"RowBlockContainer\"\n";
-  out1 << "num_parts_per_file = 1\n"; //TODO
+  out1 << "num_parts_per_file = 1\n";   //TODO
   out1.close();
 }
 
@@ -28,7 +28,8 @@ void create_testing_conf(std::string config_filename, std::string val_data,
   out1 << "model_in = \"" << model_file << machine_id << "\"\n";
   out1 << "data_format = \"RowBlockContainer\"\n";
   out1 << "predict_out = \"" << pred_file << "\"\n";
-  out1 << "num_parts_per_file = 1\n"; //TODO
+  out1 << "prob_predict = false\n";
+  out1 << "num_parts_per_file = 1\n";   //TODO
   out1.close();
 }
 
@@ -61,10 +62,12 @@ int main(int argc, char *argv[])
     return 0;
   }
 
-  std::string conf_filename ("temp_LEARN.conf");
-  std::string script_command ("/home/vpillutl/wormhole/wormhole/tracker/dmlc_local.py"); //TODO
+  std::string conf_filename("temp_LEARN.conf");
+  std::string script_command("/home/vpillutl/wormhole/wormhole/tracker/dmlc_local.py"); //TODO
   std::stringstream sss;
-  sss << script_command << " -n 1 -s 1 /home/vpillutl/wormhole/wormhole/bin/linear.dmlc " << conf_filename;
+  sss << script_command <<
+    " -n 1 -s 1 /home/vpillutl/wormhole/wormhole/bin/linear.dmlc " <<
+    conf_filename;
   std::string command = sss.str();
 
   if (train_or_test.compare("train") == 0) {
@@ -76,7 +79,7 @@ int main(int argc, char *argv[])
     std::system(command.c_str());
     //std::cout << (command) << std::endl; 
 
-  } else if (train_or_test.compare("test") == 0) {                      // testing
+  } else if (train_or_test.compare("test") == 0) {      // testing
     std::cout << "testing file" << std::endl;
     int num_parts;
     if (argc < 5) {
@@ -94,9 +97,11 @@ int main(int argc, char *argv[])
     // one for each testing part:
     for (int i = 0; i < num_parts; ++i) {
       std::ostringstream oss, oss1;
-      oss << cfg.predictions_path() << machine_id << "/"; 
+      oss << cfg.predictions_path() << machine_id << "/";
       auto pred_directory = oss.str();
-      std::cerr << "**********************pred_path: " << pred_directory << std::endl;
+      std::
+        cerr << "**********************pred_path: " << pred_directory << std::
+        endl;
       oss1 << cfg.dispatched_path(machine_id, true) << i;       // is_test=true gives testing path
       auto val_file = oss1.str();
       std::cerr << val_file << std::endl;
@@ -107,7 +112,7 @@ int main(int argc, char *argv[])
       std::system((command + " > /dev/null 2>&1").c_str());
       //std::cout << (command) << std::endl; 
     }
-  } 
+  }
   std::stringstream ss_o;
   ss_o << "rm " << conf_filename;
   std::system(ss_o.str().c_str());
