@@ -71,7 +71,7 @@ real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
 	{
 		if (r1.index[i] == (*feature_dict_ptr)[j])
 		{
-			dotProduct += (r1.value[i] * d[j]);
+			dotProduct += (r1.get_value(i) * d[j]);
 			++i; ++j;
 		}
 		else if (r1.index[i] > (*feature_dict_ptr)[j])
@@ -359,17 +359,17 @@ inline dmlc::real_t RandomPartitionTree<IndexType>::SquareDist(const dmlc::Row<I
 	{
 		if (r1.index[i] == feature_dict[r2.index[j]])
 		{
-			sqdist += (r1.value[i] - r2.value[j])*(r1.value[i] - r2.value[j]);
+			sqdist += (r1.get_value(i) - r2.get_value(j))*(r1.get_value(i) - r2.get_value(j));
 			++i; ++j;
 		}
 		else if (r1.index[i] > feature_dict[r2.index[j]])
 		{
-			sqdist += (r2.value[j])*(r2.value[j]);
+			sqdist += (r2.get_value(j))*(r2.get_value(j));
 			++j;
 		}
 		else
 		{
-			sqdist += (r1.value[i])*(r1.value[i]);
+			sqdist += (r1.get_value(i))*(r1.get_value(i));
 			++i;
 		}
 	}

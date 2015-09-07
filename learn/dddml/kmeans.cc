@@ -476,7 +476,7 @@ int main(int argc, char *argv[])
   real_t lb = lfrac * n * p / k;
   real_t ub = Lfrac * n * p / k;
 
-  auto output = kmeans(data, k, p, dim, rng, 0);
+  auto output = kmeans(data, k, p, dim, rng, 1); //1 for kmpp init
   auto assignments = output.first;
   auto centers = output.second;
 

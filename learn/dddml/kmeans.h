@@ -111,17 +111,17 @@ inline real_t squareDist(const Row<I> &r1, const Row<I> &r2)
 	{
 		if (r1.index[i] == r2.index[j])
 		{
-			sqdist += (r1.value[i] - r2.value[j])*(r1.value[i] - r2.value[j]);
+			sqdist += (r1.get_value(i) - r2.get_value(j))*(r1.get_value(i) - r2.get_value(j));
 			++i; ++j;
 		}
 		else if (r1.index[i] > r2.index[j])
 		{
-			sqdist += (r2.value[j])*(r2.value[j]);
+			sqdist += (r2.get_value(j))*(r2.get_value(j));
 			++j;
 		}
 		else
 		{
-			sqdist += (r1.value[i])*(r1.value[i]);
+			sqdist += (r1.get_value(i))*(r1.get_value(i));
 			++i;
 		}
 	}
@@ -138,7 +138,7 @@ inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim)
 	{
 		if (r1.index[i] == j)
 		{
-			sqdist += (r1.value[i] - r2[j])*(r1.value[i] - r2[j]);
+			sqdist += (r1.get_value(i) - r2[j])*(r1.get_value(i) - r2[j]);
 			++i; ++j;
 		}
 		else if (r1.index[i] > j)
@@ -182,7 +182,7 @@ inline void add_into(real_t *arr, size_t dim, const Row<I> &r1)
 	CHECK(r1.index[r1.length - 1]	 < dim);
 	for(size_t i = 0; i < r1.length; ++i)
 	{
-		arr[r1.index[i]] += r1.weight * r1.value[i];
+		arr[r1.get_index(i)] += r1.weight * r1.get_value(i);
 
 	}
 }
