@@ -101,10 +101,12 @@ template<typename I>
 std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, int center_type, std::mt19937_64 &rng, int init = 1);
 
 
-
+#if 0
 template <typename I>
 inline real_t squareDist(const Row<I> &r1, const Row<I> &r2)
 {
+	CHECK(-1 == 0) << "Should not be invoked";
+	std::cout << "******************\n";
 	size_t i,j;
 	real_t sqdist = 0.0;
 	for (i = 0, j = 0; (i < r1.length && j < r2.length); )
@@ -127,7 +129,19 @@ inline real_t squareDist(const Row<I> &r1, const Row<I> &r2)
 	}
 	return sqdist;
 }
-
+#endif
+template <typename I>
+inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim)
+{
+        CHECK(r2 != NULL);
+        real_t sqdist = 0.;
+	for (size_t i = 0; i < r1.length; ++i){
+		CHECK (r1.index[i] < dim) << "Should not occur";
+		sqdist += (r1.get_value(i) - r2[r1.get_index(i)]) * (r1.get_value(i) - r2[r1.get_index(i)]);
+	}
+	return sqdist;
+}
+#if 0
 template <typename I>
 inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim)
 {
@@ -154,8 +168,8 @@ inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim)
 		}
 	}
 	return sqdist;
-	//#endif
 }
+#endif
 
 inline real_t squareDist(const real_t *array1, const real_t *array2, size_t dim)
 {
