@@ -63,6 +63,23 @@ private:
 
 // *** RPTSplit Definitions *** //
 
+
+template <typename IndexType>
+real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
+  size_t i,j;
+  dmlc::real_t dotProduct = 0.0;
+  for (i = 0; i < r1.length; ++i){
+    for (j = 0; j < feature_dict_ptr->size(); ++j){
+      if (r1.index[i] == (*feature_dict_ptr)[j]){
+        dotProduct += (r1.get_value(i) * d[j]);
+        break;
+      }
+    }
+  }
+  return dotProduct;
+}
+
+#if 0
 template <typename IndexType>
 real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
 	size_t i,j;
@@ -85,7 +102,7 @@ real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
 	}
 	return dotProduct;
 }
-
+#endif
 template <typename IndexType>
 RPTSplit<IndexType>::RPTSplit(std::vector<IndexType> *feature_dict_ptr) : d(0), t(0), feature_dict_ptr(feature_dict_ptr) {}
 
@@ -103,8 +120,9 @@ RPTSplit<IndexType>::RPTSplit(mt19937_64 &rng, size_t dimension,
   // project each sample onto d
   vector<real_t> ps(idxs.size());
   for (size_t i = 0; i < idxs.size(); ++i) {
-    //ps[i] = data[idxs[i]].SDot(d.data(), dimension);
-    ps[i] = SparseDot(data[idxs[i]]);
+    // This code is invoked on the sample, which is already localized
+    ps[i] = data[idxs[i]].SDot(d.data(), dimension); // -- already localized
+    //ps[i] = SparseDot(data[idxs[i]]); // -- not localized
   }
   // Pick a random fractile between 1/4 and 3/4
   real_t fractile = std::uniform_real_distribution<real_t>(0.25, 0.75)(rng);
@@ -349,8 +367,38 @@ template <typename IndexType> size_t RandomPartitionTree<IndexType>::depth() {
 * r1: row with global indices
 * index: index to datapoint, we want to compare to
 */
+
+
 template <typename IndexType>
 inline dmlc::real_t RandomPartitionTree<IndexType>::SquareDist(const dmlc::Row<IndexType> &r1, size_t index)
+{
+  auto r2 = this->data.GetBlock()[index]; // convenient name
+  size_t i,j;
+  dmlc::real_t sqdist = 0.0;
+  for (i = 0; i < r1.length; ++i){ //dot(r1, r1)
+    sqdist += r1.get_value(i) * r1.get_value(i); 
+  }
+  for (j = 0; j < r2.length; ++j){ // dot(r2, r2)
+   sqdist += r2.get_value(j) * r2.get_value(j);
+  } 
+  // -2*dot(r1, r2)
+  for (i = 0; i < r1.length; ++i)
+  {
+    for (j = 0; j < r2.length; ++j)
+    {
+      if (r1.index[i] == feature_dict[r2.index[j]]){ 
+        sqdist += -2 * (r1.get_value(i) * r2.get_value(j)); 
+        break;
+      }
+    }		
+  }
+  return sqdist;
+}
+
+
+#if 0
+template <typename IndexType>
+inline dmlc::real_t RandomPartitionTree<IndexType>::SquareDistSorted(const dmlc::Row<IndexType> &r1, size_t index)
 {
 	auto r2 = this->data.GetBlock()[index]; // convenient name
 	size_t i,j;
@@ -375,6 +423,7 @@ inline dmlc::real_t RandomPartitionTree<IndexType>::SquareDist(const dmlc::Row<I
 	}
 	return sqdist;
 }
+#endif
 
 template <typename IndexType>
 size_t RandomPartitionTree<IndexType>::find_nn(dmlc::Row<IndexType> row) {

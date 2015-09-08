@@ -537,7 +537,7 @@ int main(int argc, char *argv[])
                                     cfg.dispatch_rpt_n0(), *data_rbc,
                                     *idx_dict);
   rpt.Save(cfg.dispatch_rpt_path().c_str());
-  LOG(INFO) << "Building RPT";
+  LOG(INFO) << "Built RPT";
   return new_k;
 }
 
