@@ -61,8 +61,8 @@ int main(int argc, char *argv[])
       std::endl;
     return 0;
   }
-
-  std::string conf_filename("temp_LEARN.conf");
+  //std::string temp_s("temp_LEARN.conf");
+  std::string conf_filename = (std::string(argv[1]) + "temp_LEARN.conf");
   std::string script_command("/home/vpillutl/wormhole/wormhole/tracker/dmlc_local.py"); //TODO
   std::stringstream sss;
   sss << script_command <<
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
     create_training_conf(conf_filename, cfg.dispatched_path(machine_id, false),
                          cfg.model_path(), machine_id);
     //run command
-    std::system(command.c_str());
+    std::system((command + " > /dev/null 2>&1" ).c_str());
     //std::cout << (command) << std::endl; 
 
   } else if (train_or_test.compare("test") == 0) {      // testing
@@ -99,12 +99,8 @@ int main(int argc, char *argv[])
       std::ostringstream oss, oss1;
       oss << cfg.predictions_path() << machine_id << "/";
       auto pred_directory = oss.str();
-      std::
-        cerr << "**********************pred_path: " << pred_directory << std::
-        endl;
       oss1 << cfg.dispatched_path(machine_id, true) << i;       // is_test=true gives testing path
       auto val_file = oss1.str();
-      std::cerr << val_file << std::endl;
       //create conf file
       create_testing_conf(conf_filename, val_file, pred_directory,
                           cfg.model_path(), machine_id);

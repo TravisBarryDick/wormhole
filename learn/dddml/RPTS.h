@@ -48,6 +48,8 @@ public:
   /* Determines which direction a given row should be routed by this
    * split */
   RouteDirection route(Row<IndexType> row);
+  RouteDirection route_own(Row<IndexType> row);
+
 
   /* Disk IO functions */
   void Save(dmlc::Stream *fo);
@@ -139,6 +141,13 @@ inline auto RPTSplit<IndexType>::route(Row<IndexType> row) -> RouteDirection {
   return (p > t) ? RIGHT : LEFT;
 }
 
+
+template <typename IndexType>
+inline auto RPTSplit<IndexType>::route_own(Row<IndexType> row) -> RouteDirection {
+  real_t p = row.SDot(d.data(), d.size());
+  //  real_t p = SparseDot(row);
+  return (p > t) ? RIGHT : LEFT;
+}
 
 /* IO functions */
 template <typename IndexType>
@@ -260,7 +269,7 @@ unique_ptr<RPTNode<IndexType>> make_rptree(mt19937_64 &rng, int dimension,
                                            int n0, RowBlock<IndexType> data,
                                            vector<size_t> &idxs,
                                            vector<IndexType> *feature_dict_ptr) {
-
+  //std::cout << "Starting make_rptree with " << idxs.size() << " points" << std::endl;
   if (idxs.size() <= n0) {
     return unique_ptr<RPTNode<IndexType>>(new RPTNode<IndexType>(idxs));
   } else {
@@ -268,7 +277,7 @@ unique_ptr<RPTNode<IndexType>> make_rptree(mt19937_64 &rng, int dimension,
     vector<size_t> left_idxs(0);
     vector<size_t> right_idxs(0);
     for (size_t idx : idxs) {
-      if (split.route(data[idx]) == LEFT)
+      if (split.route_own(data[idx]) == LEFT)
         left_idxs.push_back(idx);
       else
         right_idxs.push_back(idx);
@@ -341,7 +350,7 @@ RandomPartitionTree<IndexType>::RandomPartitionTree(
     dmlc::data::RowBlockContainer<IndexType> &data,
     std::vector<IndexType> &feature_dict)
     : data(data), feature_dict(feature_dict)
-{
+{ 
   tree = std::move(rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock(), &(this->feature_dict)));
 }
 
