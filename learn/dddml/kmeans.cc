@@ -233,10 +233,10 @@ namespace dddml {
         for (int j = 0; j < p; ++j)
           ++counts[(*assignments)[i][j]];
       }
-      std::cout << '\t';
-      for (int i = 0; i < k; ++i)
-        std::cout << counts[i] << ' ';
-      std::cout << std::endl;
+      //std::cout << '\t';
+      //for (int i = 0; i < k; ++i)
+      //  std::cout << counts[i] << ' ';
+      //std::cout << std::endl;
 
       update_centers(centers, data, *assignments);
       ++iter_count;
@@ -492,10 +492,10 @@ int main(int argc, char *argv[])
       ++counts[cl];
     }
   }
-  for (int i = 0; i < k; ++i) {
-    std::cout << i << ": " << counts[i] << "; " << std::endl;
-  }
-  std::cout << "-----------------------\n";
+  //for (int i = 0; i < k; ++i) {
+  //  std::cout << i << ": " << counts[i] << "; " << std::endl;
+  //}
+  //std::cout << "-----------------------\n";
 
   // heuristics
   int new_k = merge_and_split(data, assignments, centers, lb, ub, k, dim, rng);
@@ -512,9 +512,9 @@ int main(int argc, char *argv[])
       ++counts1[cl];
     }
   }
-  for (int i = 0; i < new_k; ++i) {
-    std::cout << i << ": " << counts1[i] << std::endl;
-  }
+  //for (int i = 0; i < new_k; ++i) {
+  //  std::cout << i << ": " << counts1[i] << std::endl;
+  //}
   centers.destroy();
 
   // Save the number of clusters and the assignments file
