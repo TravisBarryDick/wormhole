@@ -70,11 +70,21 @@ template <typename IndexType>
 real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
   size_t i,j;
   dmlc::real_t dotProduct = 0.0;
-  for (i = 0; i < r1.length; ++i){
-    for (j = 0; j < feature_dict_ptr->size(); ++j){
-      if (r1.index[i] == (*feature_dict_ptr)[j]){
+  if (feature_dict_ptr->size() == 1){ 
+    //hash
+    IndexType reduced_dim = (*feature_dict_ptr)[0];
+    for (i = 0; i < r1.length; ++i){
+        j = r1.index[i] % reduced_dim;
         dotProduct += (r1.get_value(i) * d[j]);
-        break;
+    }
+  } else {
+    // truncate
+    for (i = 0; i < r1.length; ++i){
+      for (j = 0; j < feature_dict_ptr->size(); ++j){
+        if (r1.index[i] == (*feature_dict_ptr)[j]){
+          dotProduct += (r1.get_value(i) * d[j]);
+          break;
+        }
       }
     }
   }
@@ -384,22 +394,38 @@ inline dmlc::real_t RandomPartitionTree<IndexType>::SquareDist(const dmlc::Row<I
   auto r2 = this->data.GetBlock()[index]; // convenient name
   size_t i,j;
   dmlc::real_t sqdist = 0.0;
-  for (i = 0; i < r1.length; ++i){ //dot(r1, r1)
-    sqdist += r1.get_value(i) * r1.get_value(i); 
-  }
-  for (j = 0; j < r2.length; ++j){ // dot(r2, r2)
-   sqdist += r2.get_value(j) * r2.get_value(j);
-  } 
-  // -2*dot(r1, r2)
-  for (i = 0; i < r1.length; ++i)
-  {
-    for (j = 0; j < r2.length; ++j)
+
+  if (feature_dict.size() == 1){
+    //hash
+    for (i = 0; i < r1.length; ++i){ //dot(r1, r1): assuming no collisions
+      sqdist += r1.get_value(i) * r1.get_value(i); 
+    }
+    for (j = 0; j < r2.length; ++j){ // dot(r2, r2)
+     sqdist += r2.get_value(j) * r2.get_value(j);
+    } 
+    auto reduced_dim = feature_dict[0];
+    for (i = 0; i < r1.length; ++i)
     {
-      if (r1.index[i] == feature_dict[r2.index[j]]){ 
-        sqdist += -2 * (r1.get_value(i) * r2.get_value(j)); 
-        break;
-      }
-    }		
+      for (j = 0; j < r2.length; ++j)
+      {
+        if (r1.index[i] % reduced_dim == r2.index[j]){ 
+          sqdist += -2 * (r1.get_value(i) * r2.get_value(j));
+          //break;
+        }
+      }   
+    }
+  } else {
+    //truncate
+    for (i = 0; i < r1.length; ++i)
+    {
+      for (j = 0; j < r2.length; ++j)
+      {
+        if (r1.index[i] == feature_dict[r2.index[j]]){ 
+          sqdist +=  (r1.get_value(i) - r2.get_value(j)) * (r1.get_value(i) - r2.get_value(j)); 
+          break;
+        }
+      }   
+    }
   }
   return sqdist;
 }
