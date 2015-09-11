@@ -13,6 +13,8 @@ message dddmlConfig {
 	optional string train_directory = 7 [default = "train/"];
 	optional string test_directory = 8 [default = "test/"];
 
+	optional string dim_reduction = 9 [default = "hash"]; //either "hash" or "truncate"
+
 	// Parameters configuring the output of the experiment
 	optional string experiment_directory = 101;
 	optional string dispatch_features_file = 102 [default = "dispatch_features"];

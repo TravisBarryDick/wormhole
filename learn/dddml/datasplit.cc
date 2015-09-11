@@ -67,7 +67,8 @@ namespace dddml {
                  unsigned int subsample_size,
                  unsigned int total_size,
                  std::mt19937_64 & rng,
-                 int nFiles, int nPartPerFile, int nPartToRead, int mb_size) {
+                 int nFiles, int nPartPerFile, int nPartToRead, int mb_size,
+                 std::string dim_reduction) {
     using real_t = dmlc::real_t;
 
     std::cout << "feature file: " << featureFile << std::endl;
@@ -97,8 +98,7 @@ namespace dddml {
     int nread = 0, naccept = 0;
 
     dmlc::data::RowBlockContainer < FeaID > sample;
-    dmlc::data::RowBlockContainer < FeaID > *sample_compressed =
-      new dmlc::data::RowBlockContainer < FeaID > ();
+    dmlc::data::RowBlockContainer < FeaID > *sample_compressed;
 
     for (int fi = 0; fi < nFiles; ++fi) {
       for (int part = 0; part < nPartToRead; ++part) {
@@ -127,36 +127,54 @@ namespace dddml {
     }
 
     /* Step 3: Localize */
-    dmlc::RowBlock < FeaID > sample1 = sample.GetBlock();
+    std::vector < FeaID > *idx_dict;
     std::vector < FeaID > *features = new std::vector < FeaID > ();
     ReadFile(featureFile, features);
-    /* 3.2: Get set of features to keep using localizer */
-    dmlc::Localizer < FeaID > lc;
-    std::vector < FeaID > *uidx = new std::vector < FeaID > ();
-    lc.CountUniqIndex < FeaID > (sample1, uidx, NULL);
-    std::sort(features->begin(), features->end());
+    if (dim_reduction.compare("hash") == 0)
+    {
+      //hashing
+      size_t reduced_dim = features->size();
+      sample_compressed = &sample;
+      idx_dict = new std::vector<FeaID>(1);
+      idx_dict[0] = reduced_dim; //idx_dict is a singleton with reduced dim
+      for (size_t i = 0; i < sample_compressed->index.size(); ++i){
+        //hash
+        sample_compressed->index[i] = sample_compressed->index[i] % reduced_dim;
+      }
+    }
+    else
+    {
+      //truncating
+      *sample_compressed = new dmlc::data::RowBlockContainer < FeaID > ();
+      dmlc::RowBlock < FeaID > sample1 = sample.GetBlock();
+      /* 3.2: Get set of features to keep using localizer */
+      dmlc::Localizer < FeaID > lc;
+      std::vector < FeaID > *uidx = new std::vector < FeaID > ();
+      lc.CountUniqIndex < FeaID > (sample1, uidx, NULL);
+      std::sort(features->begin(), features->end());
 
-    /* 3.3: intersect uidx with features */
-    std::vector < FeaID > *idx_dict = Intersect(features, uidx);
+      /* 3.3: intersect uidx with features */
+      idx_dict = Intersect(features, uidx);
 
-    std::cout << "DEBUGGING: features->size() = " << features->size()
-      << " uidx->size() = " << uidx->size()
-      << " intersection->size() = " << idx_dict->size() << std::endl;
+      std::cout << "DEBUGGING: features->size() = " << features->size()
+        << " uidx->size() = " << uidx->size()
+        << " intersection->size() = " << idx_dict->size() << std::endl;
 
-    //std::cout << "DEBUGGING1: ";
-    //for (auto i : *idx_dict) std::cout << i << ',';
-    //std::cout << std::endl;
+      //std::cout << "DEBUGGING1: ";
+      //for (auto i : *idx_dict) std::cout << i << ',';
+      //std::cout << std::endl;
 
-    /* 3.4: localize */
-    lc.RemapIndex < FeaID > (sample1, *idx_dict, sample_compressed);
+      /* 3.4: localize */
+      lc.RemapIndex < FeaID > (sample1, *idx_dict, sample_compressed);
 
 
-    std::cout << "DEBUG: sample_compressed->Size() = " << sample_compressed->
-      Size() << std::endl;
-    // for (size_t i = 0; i < sample_compressed->Size(); ++i) {
-    //      std::cout << sample_compressed->GetBlock()[i].length << " ";
-    // }
-    // std::cout << std::endl;
+      std::cout << "DEBUG: sample_compressed->Size() = " << sample_compressed->
+        Size() << std::endl;
+      // for (size_t i = 0; i < sample_compressed->Size(); ++i) {
+      //      std::cout << sample_compressed->GetBlock()[i].length << " ";
+      // }
+      // std::cout << std::endl;
+  	}
 
     /* Step 4: Write to file */
 
@@ -173,7 +191,7 @@ namespace dddml {
       delete idx_dict;
   }
 
-}                               //namespace dddml
+}//namespace dddml
 
 
 
@@ -201,5 +219,6 @@ int main(int argc, char *argv[])
             cfg.dispatch_sample_path().c_str(), cfg.data_format().c_str(),
             cfg.datasplit_sample_size(), cfg.data_num_instances(), rng,
             cfg.data_num_files(), cfg.datasplit_num_parts(),
-            cfg.datasplit_num_parts(), cfg.datasplit_minibatch_size());
+            cfg.datasplit_num_parts(), cfg.datasplit_minibatch_size(),
+            cfg.dim_reduction());
 }
