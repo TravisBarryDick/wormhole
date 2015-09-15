@@ -468,10 +468,16 @@ int main(int argc, char *argv[])
 
   auto readpair = readSamplingOutput(cfg.dispatch_sample_path().c_str());
   auto idx_dict = readpair.first;
-  int dim = idx_dict->size();   // dim = size of idx_dict
+  int dim ;
+  if (cfg.dim_reduction().compare("hash") == 0){
+    dim = cfg.analysis_num_features();
+  } else { // truncate
+    dim = idx_dict->size();   // dim = size of idx_dict
+  }
   dmlc::data::RowBlockContainer < FeaID > *data_rbc = readpair.second;  // pointer to row block container with data
   auto data = data_rbc->GetBlock();
   int n = data.size;
+  
 
   real_t lb = lfrac * n * p / k;
   real_t ub = Lfrac * n * p / k;

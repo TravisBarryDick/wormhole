@@ -52,7 +52,7 @@ void output(std::unordered_map < FeaID, size_t > &counts, int maxc,
   std::vector < FeaID > topFeatures;
   topFeatures.reserve(maxc);
   for (auto it = mm.rbegin(); it != mm.rend(); ++it) {
-    if (i <= maxc) {
+    if (i < maxc) {
       topFeatures.push_back(it->second);
       ++i;
     }

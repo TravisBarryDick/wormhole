@@ -1,13 +1,12 @@
 
 #params
-conf="./learn/dddml/dddml.conf"
+conf="./learn/dddml/dddml$1.conf"
 hostfile="bros_hostfile"
-numWorkersDispatch=5
+numWorkersDispatch=10
 numWorkersDispatchTest=$numWorkersDispatch
 
-
 #0: clear working directories, make sure folders exist
-#find ./learn/data/CTRa/experiment -type f -exec rm {} \;
+find ./learn/data/CTRa_h/experiment -type f -exec rm {} \;
 
 
 #1: analyze
@@ -17,7 +16,7 @@ learn/dddml/build/datasplit $conf
 #3: cluster
 learn/dddml/build/kmeans $conf 
 numPart=$?
-exit 1
+echo "$numPart Clusters..."
 
 #return value of clustering should be the final number of clusters
 #4: dispatch

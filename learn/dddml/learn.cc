@@ -63,12 +63,19 @@ int main(int argc, char *argv[])
   }
   //std::string temp_s("temp_LEARN.conf");
   std::string conf_filename = (std::string(argv[1]) + "temp_LEARN.conf");
-  std::string script_command("/home/vpillutl/wormhole/wormhole/tracker/dmlc_local.py"); //TODO
+  std::string script_command("/home/vpillutl/wormhole/wormhole/tracker/dmlc_mpi.py"); //TODO
+  std::string script_command_l("/home/vpillutl/wormhole/wormhole/tracker/dmlc_local.py"); //TODO
   std::stringstream sss;
-  sss << script_command <<
+  sss << script_command << " --hostfile " << cfg.hostfile() << 
+    " -n 5 -s 1 /home/vpillutl/wormhole/wormhole/bin/linear.dmlc " <<
+    conf_filename;
+  std::string training_command = sss.str();
+
+  std::stringstream ssst;
+  ssst << script_command_l << //" --hostfile " << cfg.hostfile() <<
     " -n 1 -s 1 /home/vpillutl/wormhole/wormhole/bin/linear.dmlc " <<
     conf_filename;
-  std::string command = sss.str();
+  std::string testing_command = ssst.str();
 
   if (train_or_test.compare("train") == 0) {
     std::cout << "training file" << std::endl;
@@ -76,7 +83,7 @@ int main(int argc, char *argv[])
     create_training_conf(conf_filename, cfg.dispatched_path(machine_id, false),
                          cfg.model_path(), machine_id);
     //run command
-    std::system((command + " > /dev/null 2>&1" ).c_str());
+    std::system((training_command /*+ " > /dev/null 2>&1"*/ ).c_str());
     //std::cout << (command) << std::endl; 
 
   } else if (train_or_test.compare("test") == 0) {      // testing
@@ -105,7 +112,7 @@ int main(int argc, char *argv[])
       create_testing_conf(conf_filename, val_file, pred_directory,
                           cfg.model_path(), machine_id);
       //run command
-      std::system((command + " > /dev/null 2>&1").c_str());
+      std::system((testing_command  /*+ " > /dev/null 2>&1"*/).c_str());
       //std::cout << (command) << std::endl; 
     }
   }

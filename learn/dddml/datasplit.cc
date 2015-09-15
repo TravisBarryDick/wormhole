@@ -136,7 +136,8 @@ namespace dddml {
       size_t reduced_dim = features->size();
       sample_compressed = &sample;
       idx_dict = new std::vector<FeaID>(1);
-      idx_dict[0] = reduced_dim; //idx_dict is a singleton with reduced dim
+      (*idx_dict)[0] = reduced_dim; //idx_dict is a singleton with reduced dim
+      std::cout << "reduced dim: " << reduced_dim << std::endl;
       for (size_t i = 0; i < sample_compressed->index.size(); ++i){
         //hash
         sample_compressed->index[i] = sample_compressed->index[i] % reduced_dim;
@@ -145,7 +146,7 @@ namespace dddml {
     else
     {
       //truncating
-      *sample_compressed = new dmlc::data::RowBlockContainer < FeaID > ();
+      sample_compressed = new dmlc::data::RowBlockContainer < FeaID > ();
       dmlc::RowBlock < FeaID > sample1 = sample.GetBlock();
       /* 3.2: Get set of features to keep using localizer */
       dmlc::Localizer < FeaID > lc;
@@ -166,7 +167,7 @@ namespace dddml {
 
       /* 3.4: localize */
       lc.RemapIndex < FeaID > (sample1, *idx_dict, sample_compressed);
-
+      delete uidx;
 
       std::cout << "DEBUG: sample_compressed->Size() = " << sample_compressed->
         Size() << std::endl;
@@ -174,7 +175,7 @@ namespace dddml {
       //      std::cout << sample_compressed->GetBlock()[i].length << " ";
       // }
       // std::cout << std::endl;
-  	}
+    }
 
     /* Step 4: Write to file */
 
@@ -186,7 +187,6 @@ namespace dddml {
     std::cout << "Done sampling" << std::endl;
     delete output;
     delete features;
-    delete uidx;
     if (idx_dict != NULL)
       delete idx_dict;
   }
