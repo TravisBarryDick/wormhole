@@ -26,6 +26,28 @@
 
 namespace dddml{
 using namespace dmlc;
+
+template <typename I>
+inline dmlc::real_t rowNorm(dmlc::Row<I> row){
+  if (row.value == NULL) return std::sqrt(static_cast<dmlc::real_t>(row.length));
+  else {
+  dmlc::real_t norm = 0.0;
+    for (size_t i = 0; i < row.length; ++i) norm += row.value[i] * row.value[i];
+    return std::sqrt(norm);
+  }
+}
+
+template <typename I>
+std::vector<dmlc::real_t> *FindNorms(dmlc::RowBlock<I> &data){
+  std::vector<dmlc::real_t> *norms = new std::vector<dmlc::real_t>(data.size);
+  for (size_t i = 0; i < data.size; ++i){
+    (*norms)[i] = rowNorm(data[i]);
+  }
+  return norms;
+}
+
+
+
 /*
 * Class for centers
 *
@@ -78,27 +100,35 @@ public:
 template<typename I>
 bool update_assignments( centers_t &centers, const RowBlock<I> &data, std::vector<int> &assignments);
 template<typename I>
-bool update_assignments( centers_t &centers, const RowBlock<I> &data, std::vector<std::vector<int>> &assignments);
+bool update_assignments( centers_t &centers, const RowBlock<I> &data, 
+    std::vector<std::vector<int>> &assignments, 
+    const std::vector<dmlc::real_t> *norms/* = NULL */);
 template<typename I>
 void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments);
 template<typename I>
-void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments);
+void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments,
+    const std::vector<dmlc::real_t> *norms/* = NULL */);
 template<typename I>
 void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments, int center_id);
 template<typename I>
-void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments, int center_id);
+void update_one_center(centers_t &centers, const RowBlock<I> &data, 
+    const std::vector<std::vector<int>> &assignments, int center_id,
+    const std::vector<dmlc::real_t> *norms/* = NULL */);
 template<typename I>
-centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng);
+centers_t random_init(const RowBlock<I> &data, int k, size_t dim, 
+    std::mt19937_64 &rng, const std::vector<dmlc::real_t> *norms/* = NULL */);
 template<typename I>
-centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng);
+centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, 
+    std::mt19937_64 &rng, const std::vector<dmlc::real_t> *norms/* = NULL */);
 template<typename I>
 real_t kmeans_objective(const RowBlock<I> &data, vector_int_ptr assignments, centers_t &centers);
 template<typename I>
-real_t kmeans_objective(const RowBlock<I> &data, vector_vector_int_ptr assignments, centers_t &centers);
+real_t kmeans_objective(const RowBlock<I> &data, vector_vector_int_ptr assignments, 
+    centers_t &centers, const std::vector<dmlc::real_t> *norms/* = NULL */);
 template<typename I>
 std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng, int init = 1);
 template<typename I>
-std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, int center_type, std::mt19937_64 &rng, int init = 1);
+std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, int center_type, std::mt19937_64 &rng, int init, const std::vector<dmlc::real_t> *norms/* = NULL */);
 
 
 #if 0
@@ -130,14 +160,17 @@ inline real_t squareDist(const Row<I> &r1, const Row<I> &r2)
 	return sqdist;
 }
 #endif
+/*
+ * squareDist: if norm is not mentioned, assume no normalization necessary
+ */ 
 template <typename I>
-inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim)
+inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim, dmlc::real_t norm = 1)
 {
         CHECK(r2 != NULL);
         real_t sqdist = 0.;
 	for (size_t i = 0; i < r1.length; ++i){
 		CHECK (r1.index[i] < dim) << "Should not occur";
-		sqdist += (r1.get_value(i) - r2[r1.get_index(i)]) * (r1.get_value(i) - r2[r1.get_index(i)]);
+		sqdist += (r1.get_value(i)/norm - r2[r1.get_index(i)]) * (r1.get_value(i)/norm - r2[r1.get_index(i)]);
 	}
 	return sqdist;
 }
@@ -189,14 +222,17 @@ inline void reset(real_t *array, size_t dim)
 	for (int i = 0; i < dim; ++i) array[i] = 0.0;
 }
 
+/*
+ * If norm is not mentioned, no normalization necessary
+ */ 
 template <typename I>
-inline void add_into(real_t *arr, size_t dim, const Row<I> &r1)
+inline void add_into(real_t *arr, size_t dim, const Row<I> &r1, real_t norm = 1)
 {
 	CHECK(arr != NULL);
 	CHECK(r1.index[r1.length - 1]	 < dim);
 	for(size_t i = 0; i < r1.length; ++i)
 	{
-		arr[r1.get_index(i)] += r1.weight * r1.get_value(i);
+		arr[r1.get_index(i)] += r1.weight * r1.get_value(i) / norm;
 
 	}
 }
@@ -235,14 +271,14 @@ inline real_t **initialize_centers(size_t dim, int k)
 */
 
 template<typename I>
-int find_closest(const Row<I> &row, centers_t &centers)
+int find_closest(const Row<I> &row, centers_t &centers, real_t norm = 1)
 {
 	size_t dim = centers.dim; int k = centers.k;
 	if (k == 0) return -1;
 	else if (k == 1) return 0;
 	int min_index = 0;
 	//std::cout << squareDist(row, centers[0], dim) << std::endl;
-	real_t min_dist = squareDist(row, centers[0], dim);
+	real_t min_dist = squareDist(row, centers[0], dim, norm);
 	real_t cur_dist;
 	for (size_t i = 1; i < k; ++i)
 	{
@@ -287,7 +323,7 @@ int find_closest(centers_t &all_centers, int center)
 
 // returns p nearest centers from nearest to farthest
 template<typename I>
-int *find_p_closest(int p, const Row<I> &row,  centers_t &centers)
+int *find_p_closest(int p, const Row<I> &row,  centers_t &centers, real_t norm = 1) 
 {
 	size_t dim = centers.dim; int k = centers.k;
 	if (k < p)
@@ -302,12 +338,12 @@ int *find_p_closest(int p, const Row<I> &row,  centers_t &centers)
 		std::priority_queue<std::pair<real_t, int>> pq;
 		for (int i = 0; i < p; ++i) //insert for p elements into the heap
 		{
-			pq.push(std::pair<real_t, int>(squareDist(row, centers[i], dim), i));
+			pq.push(std::pair<real_t, int>(squareDist(row, centers[i], dim, norm), i));
 		}
 		//insert rest of the distances while maintaing p smallest in the heap
 		for (int i = p; i < k; ++i)
 		{
-			sqdist = squareDist(row, centers[i], dim);
+			sqdist = squareDist(row, centers[i], dim, norm);
 			if (pq.top().first > sqdist)
 			{
 				pq.pop();
@@ -399,7 +435,8 @@ void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::v
 * Pick up random centers to initialize k-means (code: 0)
 */
 template<typename I>
-centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng)
+centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng,
+    const std::vector<dmlc::real_t> *norms/* = NULL */)
 {
 	size_t numData = data.size;
 	int *sample = SampleWithoutReplacement(k, numData, rng);
@@ -407,7 +444,7 @@ centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_6
 	centers_t centers(dim, k);
 	for (int i = 0; i < k; ++i)
 	{
-		add_into(centers[i], dim, data[sample[i]]);
+		add_into(centers[i], dim, data[sample[i]], ((norms == NULL) ? 1 : (*norms)[sample[i]]));
 	}
 
 	return centers;
@@ -417,7 +454,8 @@ centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_6
 *	k-means++ initialization (code: 1)
 */
 template<typename I>
-centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng)
+centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng,
+    const std::vector<dmlc::real_t> *norms/* = NULL */)
 {
 	real_t weight;
 	centers_t centers(dim, k);
@@ -427,27 +465,27 @@ centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 
 	for (int i = 0; i < numData; ++i) sqdists[i] = 0;
 	// initialize first center
 	std::uniform_int_distribution<> dis(0, numData-1);
-
-	add_into(centers[0], dim, data[dis(rng)]);
+  auto rndd = dis(rng);
+	add_into(centers[0], dim, data[rndd], ((norms == NULL) ? 1 : (*norms)[rndd]));
 
 	//initialize distances
 	for (int j = 0; j < numData; ++j)
 	{
 		weight = (data.weight == NULL) ? 1 : data.weight[j];
-		sqdists[j] = (weight) * squareDist(data[j], centers[0], dim);
+		sqdists[j] = (weight) * squareDist(data[j], centers[0], dim, ((norms == NULL) ? 1 : (*norms)[j]));
 	}
 	//loop for the next (k-1) centers
 	for (int i = 1; i < k; ++i)
 	{
 		//sample next center
 		int next_center = weightedSample(sqdists, numData, rng);
-		add_into(centers[i], dim, data[next_center]);
+		add_into(centers[i], dim, data[next_center]), ((norms == NULL) ? 1 : (*norms)[next_center]);
 
 		//update distances
 		for (int j = 0; j < numData; ++j)
 		{
 			weight = (data.weight == NULL) ? 1 : data.weight[j];
-			sqdists[j] = std::min(sqdists[j], squareDist(data[j], centers[i], dim));
+			sqdists[j] = std::min(sqdists[j], squareDist(data[j], centers[i], dim, ((norms == NULL) ? 1 : (*norms)[j])));
 		}
 	}
 	return centers;

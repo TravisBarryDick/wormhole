@@ -48,6 +48,7 @@ message dddmlConfig {
 	optional float clustering_lower_capacity = 1304;
 	optional float clustering_upper_capacity = 1305;
 	optional int32 clustering_seed = 1306;
+  optional int32 max_iter = 1307 [default = 1000]; 
 
 	// Dispatch Parameters:
 	optional int32 dispatch_minibatch_size = 1401;

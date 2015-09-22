@@ -43,12 +43,13 @@ public:
   /* Randomly generates a new RPTSplit. The split point t is chosen based on the
    * rows of data given by idxs. */
   RPTSplit(mt19937_64 &rng, size_t dimension, const RowBlock<IndexType> data,
-           const vector<size_t> &idxs, vector<IndexType> *feature_dict_ptr);
+           const vector<size_t> &idxs, vector<IndexType> *feature_dict_ptr,
+           vector<dmlc::real_t> *norms);
 
   /* Determines which direction a given row should be routed by this
    * split */
   RouteDirection route(Row<IndexType> row);
-  RouteDirection route_own(Row<IndexType> row);
+  RouteDirection route_own(Row<IndexType> row, dmlc::real_t norm);
 
 
   /* Disk IO functions */
@@ -59,7 +60,7 @@ private:
   vector<real_t> d; // The direction for the split
   real_t t;         // The split point
   vector<IndexType> *feature_dict_ptr; // feature map
-
+  bool normalized;
   real_t SparseDot(Row<IndexType> row);
 };
 
@@ -69,17 +70,19 @@ private:
 template <typename IndexType>
 real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
   size_t i,j;
-  dmlc::real_t dotProduct = 0.0;
+  dmlc::real_t dotProduct = 0.0, sqnorm = 0.0;
   if (feature_dict_ptr->size() == 1){ 
     //hash
     IndexType reduced_dim = (*feature_dict_ptr)[0];
     for (i = 0; i < r1.length; ++i){
         j = r1.index[i] % reduced_dim;
         dotProduct += (r1.get_value(i) * d[j]);
+        sqnorm += r1.get_value(i) * r1.get_value(i);
     }
   } else {
     // truncate
     for (i = 0; i < r1.length; ++i){
+      sqnorm += r1.get_value(i) * r1.get_value(i);
       for (j = 0; j < feature_dict_ptr->size(); ++j){
         if (r1.index[i] == (*feature_dict_ptr)[j]){
           dotProduct += (r1.get_value(i) * d[j]);
@@ -88,7 +91,7 @@ real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
       }
     }
   }
-  return dotProduct;
+  return dotProduct / (normalized? sqrt(sqnorm) : 1); //TODO
 }
 
 #if 0
@@ -116,14 +119,17 @@ real_t RPTSplit<IndexType>::SparseDot(Row<IndexType> r1){
 }
 #endif
 template <typename IndexType>
-RPTSplit<IndexType>::RPTSplit(std::vector<IndexType> *feature_dict_ptr) : d(0), t(0), feature_dict_ptr(feature_dict_ptr) {}
+RPTSplit<IndexType>::RPTSplit(std::vector<IndexType> *feature_dict_ptr) 
+    : d(0), t(0), feature_dict_ptr(feature_dict_ptr), normalized(false) {}
 
 template <typename IndexType>
 RPTSplit<IndexType>::RPTSplit(mt19937_64 &rng, size_t dimension,
                    const RowBlock<IndexType> data,
                    const vector<size_t> &idxs,
-                   vector<IndexType> *feature_dict_ptr)
+                   vector<IndexType> *feature_dict_ptr,
+                   vector<dmlc::real_t> *norms)
     : d(dimension) , feature_dict_ptr(feature_dict_ptr) {
+  normalized = (norms != NULL);
   // sample a random direction d
   auto std_normal = normal_distribution<real_t>();
   for (size_t i = 0; i < dimension; i++) {
@@ -133,7 +139,8 @@ RPTSplit<IndexType>::RPTSplit(mt19937_64 &rng, size_t dimension,
   vector<real_t> ps(idxs.size());
   for (size_t i = 0; i < idxs.size(); ++i) {
     // This code is invoked on the sample, which is already localized
-    ps[i] = data[idxs[i]].SDot(d.data(), dimension); // -- already localized
+    ps[i] = data[idxs[i]].SDot(d.data(), dimension) / 
+            (normalized ? (*norms)[idxs[i]] : 1); // -- already localized
     //ps[i] = SparseDot(data[idxs[i]]); // -- not localized
   }
   // Pick a random fractile between 1/4 and 3/4
@@ -153,8 +160,8 @@ inline auto RPTSplit<IndexType>::route(Row<IndexType> row) -> RouteDirection {
 
 
 template <typename IndexType>
-inline auto RPTSplit<IndexType>::route_own(Row<IndexType> row) -> RouteDirection {
-  real_t p = row.SDot(d.data(), d.size());
+inline auto RPTSplit<IndexType>::route_own(Row<IndexType> row, dmlc::real_t norm) -> RouteDirection {
+  real_t p = row.SDot(d.data(), d.size()) / norm;
   //  real_t p = SparseDot(row);
   return (p > t) ? RIGHT : LEFT;
 }
@@ -165,6 +172,7 @@ void RPTSplit<IndexType>::Save(dmlc::Stream *fo){
   //save split point first, and then the split direction
   fo->Write(&t, sizeof(real_t));
   fo->Write(d);
+  fo->Write(&normalized, sizeof(bool));
 }
 
 template <typename IndexType>
@@ -173,6 +181,7 @@ inline unique_ptr<RPTSplit<IndexType>> RPTSplit<IndexType>::Load(dmlc::Stream *f
   auto ptr = unique_ptr<RPTSplit<IndexType>>(new RPTSplit(feature_dict_ptr1));
   fi->Read(&(ptr->t), sizeof(real_t));
   fi->Read(&(ptr->d));
+  fi->Read(&(ptr->normalized), sizeof(bool));
   return ptr;
 }
 
@@ -278,22 +287,23 @@ template <typename IndexType>
 unique_ptr<RPTNode<IndexType>> make_rptree(mt19937_64 &rng, int dimension,
                                            int n0, RowBlock<IndexType> data,
                                            vector<size_t> &idxs,
-                                           vector<IndexType> *feature_dict_ptr) {
+                                           vector<IndexType> *feature_dict_ptr,
+                                           vector<dmlc::real_t> *norms) {
   //std::cout << "Starting make_rptree with " << idxs.size() << " points" << std::endl;
   if (idxs.size() <= n0) {
     return unique_ptr<RPTNode<IndexType>>(new RPTNode<IndexType>(idxs));
   } else {
-    auto split = RPTSplit<IndexType>(rng, dimension, data, idxs, feature_dict_ptr);
+    auto split = RPTSplit<IndexType>(rng, dimension, data, idxs, feature_dict_ptr, norms);
     vector<size_t> left_idxs(0);
     vector<size_t> right_idxs(0);
     for (size_t idx : idxs) {
-      if (split.route_own(data[idx]) == LEFT)
+      if (split.route_own(data[idx], ((norms == NULL) ? 1.0f : (*norms)[idx])) == LEFT)
         left_idxs.push_back(idx);
       else
         right_idxs.push_back(idx);
     }
-    auto left = make_rptree(rng, dimension, n0, data, left_idxs, feature_dict_ptr);
-    auto right = make_rptree(rng, dimension, n0, data, right_idxs, feature_dict_ptr);
+    auto left = make_rptree(rng, dimension, n0, data, left_idxs, feature_dict_ptr, norms);
+    auto right = make_rptree(rng, dimension, n0, data, right_idxs, feature_dict_ptr, norms);
     return unique_ptr<RPTNode<IndexType>>(
         new RPTNode<IndexType>(split, left, right));
   }
@@ -301,11 +311,12 @@ unique_ptr<RPTNode<IndexType>> make_rptree(mt19937_64 &rng, int dimension,
 
 template <typename IndexType>
 unique_ptr<RPTNode<IndexType>> make_rptree(mt19937_64 &rng, int dimension,
-                                           int n0, RowBlock<IndexType> data, vector<IndexType> *feature_dict_ptr) {
+                                           int n0, RowBlock<IndexType> data, vector<IndexType> *feature_dict_ptr,
+                                           vector<dmlc::real_t> *norms) {
   vector<size_t> idxs(data.size);
   for (size_t i = 0; i < data.size; ++i)
     idxs[i] = i;
-  return make_rptree(rng, dimension, n0, data, idxs, feature_dict_ptr);
+  return make_rptree(rng, dimension, n0, data, idxs, feature_dict_ptr, norms);
 }
 
 
@@ -325,13 +336,15 @@ template <typename IndexType> class RandomPartitionTree {
 public:
   RandomPartitionTree(std::mt19937_64 &rng, int dimension, int n0,
                       dmlc::data::RowBlockContainer<IndexType> &data,
-                      std::vector<IndexType> &feature_dict);
+                      std::vector<IndexType> &feature_dict,
+                      std::vector<dmlc::real_t> *norms = NULL);
 
-  RandomPartitionTree(std::mt19937_64 &rng, int dimension, int n0,
-                      dmlc::data::RowBlockContainer<IndexType> &data,
-                      std::vector<size_t> &idxs,
-                      std::vector<IndexType> &feature_dict);
-
+//  RandomPartitionTree(std::mt19937_64 &rng, int dimension, int n0,
+//                      dmlc::data::RowBlockContainer<IndexType> &data,
+//                      std::vector<size_t> &idxs,
+//                      std::vector<IndexType> &feature_dict,
+//                      std::vector<dmlc::real_t> *norms = NULL);
+//
   auto depth() -> size_t;
 
   auto find_nn(dmlc::Row<IndexType> row) -> size_t;
@@ -347,6 +360,7 @@ public:
 private:
   std::vector<IndexType> feature_dict;
   dmlc::data::RowBlockContainer<IndexType> data;
+  std::vector<dmlc::real_t> *norms;
   std::unique_ptr<rpt_impl::RPTNode<IndexType>> tree;
 
   inline dmlc::real_t SquareDist(const dmlc::Row<IndexType> &r1, size_t index);
@@ -358,23 +372,26 @@ template <typename IndexType>
 RandomPartitionTree<IndexType>::RandomPartitionTree(
     std::mt19937_64 &rng, int dimension, int n0,
     dmlc::data::RowBlockContainer<IndexType> &data,
-    std::vector<IndexType> &feature_dict)
-    : data(data), feature_dict(feature_dict)
-{ 
-  tree = std::move(rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock(), &(this->feature_dict)));
-}
-
-
-template <typename IndexType>
-RandomPartitionTree<IndexType>::RandomPartitionTree(
-    std::mt19937_64 &rng, int dimension, int n0,
-    dmlc::data::RowBlockContainer<IndexType> &data,
-    std::vector<size_t> &idxs,
-    std::vector<IndexType> &feature_dict)
-    : data(data), feature_dict(feature_dict)
+    std::vector<IndexType> &feature_dict,
+    std::vector<dmlc::real_t> *norms)
+    : data(data), feature_dict(feature_dict), norms(norms)
 {
-  tree = rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock(), idxs, &(this->feature_dict));
+  std::cerr << "Using" << ((norms == NULL) ? " Un-" : " ") << "Normalized distances" << std::endl;
+  tree = std::move(rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock(), &(this->feature_dict), norms));
 }
+
+
+//template <typename IndexType>
+//RandomPartitionTree<IndexType>::RandomPartitionTree(
+//    std::mt19937_64 &rng, int dimension, int n0,
+//    dmlc::data::RowBlockContainer<IndexType> &data,
+//    std::vector<size_t> &idxs,
+//    std::vector<IndexType> &feature_dict,
+//    std::vector<dmlc::real_t> *norms)
+//    : data(data), feature_dict(feature_dict), norms(norms)
+//{
+//  tree = rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock(), idxs, &(this->feature_dict), norms);
+//}
 
 template <typename IndexType> size_t RandomPartitionTree<IndexType>::depth() {
   return tree->depth();
@@ -393,16 +410,17 @@ inline dmlc::real_t RandomPartitionTree<IndexType>::SquareDist(const dmlc::Row<I
 {
   auto r2 = this->data.GetBlock()[index]; // convenient name
   size_t i,j;
-  dmlc::real_t sqdist = 0.0;
+  dmlc::real_t sqdist = 0.0, sqnorm1 = 0.0, sqnorm2 = 0.0;
+
+  for (i = 0; i < r1.length; ++i){ //dot(r1, r1)
+    sqnorm1 += r1.get_value(i) * r1.get_value(i); 
+  }
+  for (j = 0; j < r2.length; ++j){ // dot(r2, r2)
+    sqnorm2 += r2.get_value(j) * r2.get_value(j);
+  }
 
   if (feature_dict.size() == 1){
     //hash
-    for (i = 0; i < r1.length; ++i){ //dot(r1, r1): assuming no collisions
-      sqdist += r1.get_value(i) * r1.get_value(i); 
-    }
-    for (j = 0; j < r2.length; ++j){ // dot(r2, r2)
-     sqdist += r2.get_value(j) * r2.get_value(j);
-    } 
     auto reduced_dim = feature_dict[0];
     for (i = 0; i < r1.length; ++i)
     {
@@ -421,11 +439,17 @@ inline dmlc::real_t RandomPartitionTree<IndexType>::SquareDist(const dmlc::Row<I
       for (j = 0; j < r2.length; ++j)
       {
         if (r1.index[i] == feature_dict[r2.index[j]]){ 
-          sqdist +=  (r1.get_value(i) - r2.get_value(j)) * (r1.get_value(i) - r2.get_value(j)); 
+          sqdist +=  -2 * (r1.get_value(i) * r2.get_value(j)); 
           break;
         }
       }   
     }
+  }
+  if (this->norms == NULL) { // no need to normalize
+    sqdist += sqnorm1 + sqnorm2;
+  } else { // normalize
+    sqdist = sqdist / std::sqrt(sqnorm1 * sqnorm2);
+    sqdist += 2;
   }
   return sqdist;
 }

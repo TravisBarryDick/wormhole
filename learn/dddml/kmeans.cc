@@ -37,7 +37,7 @@
 
 /*
 * -----------------------------------------------------------
-*	IMPLEMENTATION of fault tolerant k-MEANS with k-means++ INITIALIZATION
+*       IMPLEMENTATION of fault tolerant k-MEANS with k-means++ INITIALIZATION
 * -----------------------------------------------------------
 */
 
@@ -59,7 +59,8 @@ namespace dddml {
 
    template < typename I >
     bool update_assignments(centers_t & centers, const RowBlock < I > &data,
-                            std::vector < std::vector < int >>&assignments) {
+                            std::vector < std::vector < int >>&assignments,
+                            const std::vector<real_t> *norms/* = NULL */) {
     size_t dim = centers.dim;
     int k = centers.k;
     size_t p = assignments[0].size(), n = data.size;
@@ -67,7 +68,7 @@ namespace dddml {
     bool changed = false;
      std::vector < int >assignment;
     for (size_t i = 0; i < n; ++i) {
-      auto p_closest = find_p_closest(p, data[i], centers);
+      auto p_closest = find_p_closest(p, data[i], centers, ((norms == NULL)? 1: (*norms)[i]) );
       for (size_t j = 0; j < p; ++j) {
         if (assignments[i][j] != p_closest[j]) {
           changed = true;
@@ -86,7 +87,8 @@ namespace dddml {
 */
   template < typename I >
     void update_centers(centers_t & centers, const RowBlock < I > &data,
-                        const std::vector < std::vector < int >>&assignments) {
+                        const std::vector < std::vector < int >>&assignments,
+                        const std::vector<real_t> *norms/* = NULL */) {
     size_t dim = centers.dim;
     int k = centers.k;
     size_t p = assignments[0].size(), n = data.size;
@@ -101,7 +103,7 @@ namespace dddml {
     for (int i = 0; i < assignments.size(); ++i) {
       for (int j = 0; j < p; ++j) {
         if (assignments[i][j] >= 0) {   //valid assignment
-          add_into(centers[assignments[i][j]], dim, data[i]);
+          add_into(centers[assignments[i][j]], dim, data[i], ((norms == NULL) ? 1 : (*norms)[i]));
           counts[assignments[i][j]] +=
             (data.weight == NULL) ? 1 : data.weight[i];
         }
@@ -127,7 +129,7 @@ namespace dddml {
   template < typename I >
     void update_one_center(centers_t & centers, const RowBlock < I > &data,
                            const std::vector < std::vector < int >>&assignments,
-                           int center_id) {
+                           int center_id, const std::vector<real_t> *norms) {
     size_t dim = centers.dim;
     int k = centers.k;
     size_t p = assignments[0].size(), n = data.size;
@@ -138,7 +140,7 @@ namespace dddml {
     for (int i = 0; i < assignments.size(); ++i) {
       for (int j = 0; j < p; ++j) {
         if (assignments[i][j] == center_id) {   //valid assignment
-          add_into(centers[center_id], dim, data[i]);
+          add_into(centers[center_id], dim, data[i], ((norms == NULL) ? 1 : (*norms)[i]));
           count += (data.weight == NULL) ? 1 : data.weight[i];
         }
       }
@@ -151,7 +153,8 @@ namespace dddml {
   template < typename I >
     real_t kmeans_objective(const RowBlock < I > &data,
                             vector_vector_int_ptr assignments,
-                            centers_t & centers) {
+                            centers_t & centers,
+                            const std::vector<real_t> *norms) {
     size_t dim = centers.dim;
     int k = centers.k;
     size_t n = data.size;
@@ -174,14 +177,15 @@ namespace dddml {
 
 /*
 * -----------------------------------------------------------------------
-*	k-means
+*       k-means
 * ----------------------------------------------------------------------
 */
 
   template < typename I >
     std::pair < vector_vector_int_ptr,
     centers_t > kmeans(const RowBlock < I > &data, int k, int p, size_t dim,
-                       std::mt19937_64 & rng, int init) {
+                       std::mt19937_64 & rng, int init, int max_iter,
+                       const std::vector<real_t>* norms = NULL ) {
     double start, time;
 
 #if DISTRIBUTED
@@ -198,9 +202,9 @@ namespace dddml {
     centers_t centers(dim, k);
     start = GetTime();
     if (init == 0)
-      centers = random_init(data, k, dim, rng);
+      centers = random_init(data, k, dim, rng, norms);
     else                        //kmpp
-      centers = kmpp_init(data, k, dim, rng);
+      centers = kmpp_init(data, k, dim, rng, norms);
     time = GetTime() - start;
 
 #if DISTRIBUTED
@@ -223,8 +227,8 @@ namespace dddml {
                                                              int >(p));
     start = GetTime();
     int iter_count = 0;
-    while (changed) {
-      changed = update_assignments(centers, data, *assignments);
+    while (changed && (iter_count < max_iter)) {
+      changed = update_assignments(centers, data, *assignments, norms);
 
       int counts[k];
       for (int i = 0; i < k; ++i)
@@ -238,11 +242,10 @@ namespace dddml {
       //  std::cout << counts[i] << ' ';
       //std::cout << std::endl;
 
-      update_centers(centers, data, *assignments);
+      update_centers(centers, data, *assignments, norms);
       ++iter_count;
       std::cout << iter_count << ": objective: " << kmeans_objective(data,
-                                                                     assignments,
-                                                                     centers) <<
+                                                    assignments, centers, norms) <<
         std::endl;
     }
     time = GetTime() - start;
@@ -261,8 +264,8 @@ namespace dddml {
   }
 
 /*
-*	MERGE AND SPLIT HEURISTICS:
-*	 Heuristics to merge clusters that are too small and split clusters that are too big
+*       MERGE AND SPLIT HEURISTICS:
+*        Heuristics to merge clusters that are too small and split clusters that are too big
 *
 */
 
@@ -279,7 +282,8 @@ namespace dddml {
     int merge_and_split(const RowBlock < I > &data,
                         vector_vector_int_ptr assignments, centers_t & centers,
                         real_t lower_bound, real_t upper_bound, int k,
-                        size_t dim, std::mt19937_64 & rng) {
+                        size_t dim, std::mt19937_64 & rng, 
+                        const std::vector<dmlc::real_t> *norms/* = NULL */){
     //preprocess
     int current_k = k, p = (*assignments)[0].size();
     real_t current_lower = lower_bound, current_upper = upper_bound;
@@ -319,7 +323,7 @@ namespace dddml {
         }
         //update centers:
         centers.reset(i, std::numeric_limits < real_t >::max());
-        update_one_center(centers, data, (*assignments), new_index);
+        update_one_center(centers, data, (*assignments), new_index, norms);
       }
     }
     //modify upper bound (it gets looser) and leave lower bound intact
@@ -418,6 +422,7 @@ namespace dddml {
 
 }                               //namespace dddml
 
+
 #if DISTRIBUTED
 namespace ps {
   App *App::Create(int argc, char *argv[]) {
@@ -444,9 +449,11 @@ myPair readSamplingOutput(const char *filename)
   return myPair(idx, data);
 }
 
+
+
 /* Main function:
- * 	Make sure to return the final number of clusters. 
- * 	More scripts depend on this.
+ *      Make sure to return the final number of clusters. 
+ *      More scripts depend on this.
  */
 int main(int argc, char *argv[])
 {
@@ -465,6 +472,7 @@ int main(int argc, char *argv[])
   int p = cfg.clustering_replication();
   real_t lfrac = cfg.clustering_lower_capacity();
   real_t Lfrac = cfg.clustering_upper_capacity();
+  int max_iter = cfg.max_iter();
 
   auto readpair = readSamplingOutput(cfg.dispatch_sample_path().c_str());
   auto idx_dict = readpair.first;
@@ -481,8 +489,9 @@ int main(int argc, char *argv[])
 
   real_t lb = lfrac * n * p / k;
   real_t ub = Lfrac * n * p / k;
-
-  auto output = kmeans(data, k, p, dim, rng, 1); //1 for kmpp init
+  
+  auto norms = FindNorms(data);
+  auto output = kmeans(data, k, p, dim, rng, 1, max_iter, norms); //1 for kmpp init
   auto assignments = output.first;
   auto centers = output.second;
 
@@ -504,20 +513,20 @@ int main(int argc, char *argv[])
   //std::cout << "-----------------------\n";
 
   // heuristics
-  int new_k = merge_and_split(data, assignments, centers, lb, ub, k, dim, rng);
+  int new_k = merge_and_split(data, assignments, centers, lb, ub, k, dim, rng, norms);
 
   // printing
-  int counts1[new_k];
-  for (int i = 0; i < new_k; ++i) {
-    counts1[i] = 0;
-  }
-
-  for (int i = 0; i < assignments->size(); ++i) {
-    for (int j = 0; j < p; ++j) {
-      int cl = (*assignments)[i][j];
-      ++counts1[cl];
-    }
-  }
+//  int counts1[new_k];
+//  for (int i = 0; i < new_k; ++i) {
+//    counts1[i] = 0;
+//  }
+//
+//  for (int i = 0; i < assignments->size(); ++i) {
+//    for (int j = 0; j < p; ++j) {
+//      int cl = (*assignments)[i][j];
+//      ++counts1[cl];
+//    }
+//  }
   //for (int i = 0; i < new_k; ++i) {
   //  std::cout << i << ": " << counts1[i] << std::endl;
   //}
