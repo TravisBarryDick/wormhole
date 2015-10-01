@@ -103,7 +103,7 @@ namespace dddml {
     for (int i = 0; i < assignments.size(); ++i) {
       for (int j = 0; j < p; ++j) {
         if (assignments[i][j] >= 0) {   //valid assignment
-          add_into(centers[assignments[i][j]], dim, data[i], ((norms == NULL) ? 1 : (*norms)[i]));
+          add_into(centers[assignments[i][j]], dim, data[i],  ((norms == NULL) ? 1 : (*norms)[i])  );
           counts[assignments[i][j]] +=
             (data.weight == NULL) ? 1 : data.weight[i];
         }
@@ -167,7 +167,7 @@ namespace dddml {
           ++count;
           real_t weight = (data.weight == NULL) ? 1 : data.weight[i];
           obj +=
-            weight * squareDist(data[i], centers[(*assignments)[i][j]], dim);
+            weight * squareDist(data[i], centers[(*assignments)[i][j]], dim, ((norms == NULL)? 1: (*norms)[i]));
         }
       }
     }
@@ -237,11 +237,11 @@ namespace dddml {
         for (int j = 0; j < p; ++j)
           ++counts[(*assignments)[i][j]];
       }
-      //std::cout << '\t';
-      //for (int i = 0; i < k; ++i)
-      //  std::cout << counts[i] << ' ';
-      //std::cout << std::endl;
-
+//      std::cerr << '\t';
+//      for (int i = 0; i < k; ++i)
+//        std::cerr << counts[i] << ' ';
+//      std::cerr << std::endl;
+      
       update_centers(centers, data, *assignments, norms);
       ++iter_count;
       std::cout << iter_count << ": objective: " << kmeans_objective(data,
@@ -491,6 +491,7 @@ int main(int argc, char *argv[])
   real_t ub = Lfrac * n * p / k;
   
   auto norms = FindNorms(data);
+  if (!cfg.use_normalized_distances()) norms = NULL;
   auto output = kmeans(data, k, p, dim, rng, 1, max_iter, norms); //1 for kmpp init
   auto assignments = output.first;
   auto centers = output.second;
@@ -507,28 +508,28 @@ int main(int argc, char *argv[])
       ++counts[cl];
     }
   }
-  //for (int i = 0; i < k; ++i) {
-  //  std::cout << i << ": " << counts[i] << "; " << std::endl;
-  //}
-  //std::cout << "-----------------------\n";
+//  for (int i = 0; i < k; ++i) {
+//    std::cerr << i << ": " << counts[i] << "; " << std::endl;
+//  }
+//  std::cout << "-----------------------\n";
 
   // heuristics
   int new_k = merge_and_split(data, assignments, centers, lb, ub, k, dim, rng, norms);
 
   // printing
-//  int counts1[new_k];
-//  for (int i = 0; i < new_k; ++i) {
-//    counts1[i] = 0;
-//  }
-//
-//  for (int i = 0; i < assignments->size(); ++i) {
-//    for (int j = 0; j < p; ++j) {
-//      int cl = (*assignments)[i][j];
-//      ++counts1[cl];
-//    }
-//  }
+  int counts1[new_k];
+  for (int i = 0; i < new_k; ++i) {
+    counts1[i] = 0;
+  }
+
+  for (int i = 0; i < assignments->size(); ++i) {
+    for (int j = 0; j < p; ++j) {
+      int cl = (*assignments)[i][j];
+      ++counts1[cl];
+    }
+  }
   //for (int i = 0; i < new_k; ++i) {
-  //  std::cout << i << ": " << counts1[i] << std::endl;
+  //  std::cerr << i << ": " << counts1[i] << std::endl;
   //}
   centers.destroy();
 
@@ -550,7 +551,7 @@ int main(int argc, char *argv[])
   // Build a random partition tree on the sample and save it to file
   RandomPartitionTree < FeaID > rpt(rng, static_cast < int >(dim),
                                     cfg.dispatch_rpt_n0(), *data_rbc,
-                                    *idx_dict);
+                                    *idx_dict, norms);
   rpt.Save(cfg.dispatch_rpt_path().c_str());
   LOG(INFO) << "Built RPT";
   return new_k;

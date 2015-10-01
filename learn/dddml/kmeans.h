@@ -31,9 +31,9 @@ template <typename I>
 inline dmlc::real_t rowNorm(dmlc::Row<I> row){
   if (row.value == NULL) return std::sqrt(static_cast<dmlc::real_t>(row.length));
   else {
-  dmlc::real_t norm = 0.0;
-    for (size_t i = 0; i < row.length; ++i) norm += row.value[i] * row.value[i];
-    return std::sqrt(norm);
+    dmlc::real_t sqnorm = 0.0;
+    for (size_t i = 0; i < row.length; ++i) sqnorm += row.value[i] * row.value[i];
+    return std::sqrt(sqnorm);
   }
 }
 
@@ -164,10 +164,9 @@ inline real_t squareDist(const Row<I> &r1, const Row<I> &r2)
  * squareDist: if norm is not mentioned, assume no normalization necessary
  */ 
 template <typename I>
-inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim, dmlc::real_t norm = 1)
-{
-        CHECK(r2 != NULL);
-        real_t sqdist = 0.;
+inline real_t squareDist(const Row<I> &r1, const real_t *r2, size_t dim, dmlc::real_t norm /*= 1*/){
+  CHECK(r2 != NULL);
+  real_t sqdist = 0.;
 	for (size_t i = 0; i < r1.length; ++i){
 		CHECK (r1.index[i] < dim) << "Should not occur";
 		sqdist += (r1.get_value(i)/norm - r2[r1.get_index(i)]) * (r1.get_value(i)/norm - r2[r1.get_index(i)]);
@@ -226,7 +225,7 @@ inline void reset(real_t *array, size_t dim)
  * If norm is not mentioned, no normalization necessary
  */ 
 template <typename I>
-inline void add_into(real_t *arr, size_t dim, const Row<I> &r1, real_t norm = 1)
+inline void add_into(real_t *arr, size_t dim, const Row<I> &r1, real_t norm/* = 1*/)
 {
 	CHECK(arr != NULL);
 	CHECK(r1.index[r1.length - 1]	 < dim);
@@ -407,6 +406,8 @@ void read_assignments(const char *inpath,
 // Initialization /////
 ///////////////////////
 
+#if 0
+//old  
 template<typename I>
 void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments, int center_id)
 {
@@ -429,6 +430,7 @@ void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::v
 	//average
 	divide_by(centers[center_id], dim, count);
 }
+#endif
 
 
 /*
@@ -479,7 +481,7 @@ centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 
 	{
 		//sample next center
 		int next_center = weightedSample(sqdists, numData, rng);
-		add_into(centers[i], dim, data[next_center]), ((norms == NULL) ? 1 : (*norms)[next_center]);
+		add_into(centers[i], dim, data[next_center], ((norms == NULL) ? 1 : (*norms)[next_center]));
 
 		//update distances
 		for (int j = 0; j < numData; ++j)

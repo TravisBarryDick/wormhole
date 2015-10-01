@@ -82,14 +82,15 @@ int WorkerNodeMain(int argc, char* argv[]) {
       MinibatchIter<FeaID> reader(
           filename.c_str(), part,
           static_cast<size_t>(cfg.data_parts_per_file()),
-          cfg.data_format().c_str(), cfg.dispatch_minibatch_size());
+          (is_test ? cfg.data_format_test().c_str() : cfg.data_format().c_str()), 
+          cfg.dispatch_minibatch_size());
       reader.BeforeFirst();
       while (reader.Next()) {
         auto mb = reader.Value();
         for (size_t i = 0; i < mb.size; ++i) {
           size_t nn_idx = rpt.find_nn(mb[i]);
           ++count_processed;
-          if (count_processed % 10000 == 0)
+          if (count_processed % 100000 == 0)
           {
             std::cout << "Worker " << MyRank() << " processed " << count_processed << " examples" << std::endl;
           }

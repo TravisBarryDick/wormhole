@@ -219,6 +219,6 @@ int main(int argc, char *argv[])
             cfg.dispatch_sample_path().c_str(), cfg.data_format().c_str(),
             cfg.datasplit_sample_size(), cfg.data_num_instances(), rng,
             cfg.data_num_files(), cfg.datasplit_num_parts(),
-            cfg.datasplit_num_parts(), cfg.datasplit_minibatch_size(),
+            cfg.datasplit_num_parts_to_read(), cfg.datasplit_minibatch_size(),
             cfg.dim_reduction());
 }

@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <unistd.h>
 //#include "ps.h"
 
 
@@ -72,7 +73,7 @@ int main(int argc, char *argv[])
   std::string training_command = sss.str();
 
   std::stringstream ssst;
-  ssst << script_command_l << //" --hostfile " << cfg.hostfile() <<
+  ssst << script_command_l << //  << " --hostfile " << cfg.hostfile() <<
     " -n 1 -s 1 /home/vpillutl/wormhole/wormhole/bin/linear.dmlc " <<
     conf_filename;
   std::string testing_command = ssst.str();
@@ -83,6 +84,7 @@ int main(int argc, char *argv[])
     create_training_conf(conf_filename, cfg.dispatched_path(machine_id, false),
                          cfg.model_path(), machine_id);
     //run command
+    sleep(1);
     std::system((training_command /*+ " > /dev/null 2>&1"*/ ).c_str());
     //std::cout << (command) << std::endl; 
 
@@ -112,6 +114,7 @@ int main(int argc, char *argv[])
       create_testing_conf(conf_filename, val_file, pred_directory,
                           cfg.model_path(), machine_id);
       //run command
+      sleep(1);
       std::system((testing_command  /*+ " > /dev/null 2>&1"*/).c_str());
       //std::cout << (command) << std::endl; 
     }

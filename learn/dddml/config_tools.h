@@ -96,6 +96,13 @@ class SmartDDDMLConfig : public dddmlConfig {
     buffer << dispatched_path(is_test) << cluster << "/";
     return buffer.str();
   }
+  
+
+  std::string data_format_test() const{
+    std::string base = dddmlConfig::data_format_test();
+    if (base.compare("*") == 0) return data_format();
+    else return base;
+  }
 };
 
 SmartDDDMLConfig load_config(const std::string& filename) {

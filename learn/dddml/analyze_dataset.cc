@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
     new dmlc::data::RowBlockContainer < FeaID > ();
   unsigned long long count_features = 0;
   for (int fi = 0; fi < cfg.data_num_files(); ++fi) {
-    for (int part = 0; part < cfg.analysis_num_parts(); ++part) {
+    for (int part = 0; part < cfg.analysis_num_parts_to_read(); ++part) {
       int partID = part_dist(rng);
 
       string filename = cfg.data_path(fi);

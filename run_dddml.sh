@@ -1,12 +1,14 @@
 
 #params
-conf="./learn/dddml/dddml$1.conf"
-hostfile="bros_hostfile"
-numWorkersDispatch=10
+dataset=$1
+expt=$2
+conf="./learn/data/$dataset/conf/dddml$expt.conf"
+hostfile="hostfile/bros$expt"
+numWorkersDispatch=5
 numWorkersDispatchTest=$numWorkersDispatch
-
+echo $conf 
 #0: clear working directories, make sure folders exist
-find ./learn/data/CTRa_h/experiment -type f -exec rm {} \;
+find ./learn/data/$dataset/experiment$expt -type f -exec rm {} \;
 
 
 #1: analyze
@@ -17,7 +19,7 @@ learn/dddml/build/datasplit $conf
 learn/dddml/build/kmeans $conf 
 numPart=$?
 echo "$numPart Clusters..."
-
+echo $numPart > ./learn/data/$dataset/experiment$expt/ncluster
 #return value of clustering should be the final number of clusters
 #4: dispatch
 ./tracker/dmlc_mpi.py -n $numWorkersDispatch -s 1 --hostfile $hostfile learn/dddml/build/dispatcher $conf train
@@ -38,4 +40,5 @@ do
 done
 
 ./learn/dddml/build/evaluate_accuracy $conf $numPart $numWorkersDispatchTest
- 
+
+find ./learn/data/$dataset/experiment$expt -type f -exec rm {} \;
