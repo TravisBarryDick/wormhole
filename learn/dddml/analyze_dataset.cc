@@ -55,8 +55,8 @@ void output(std::unordered_map < FeaID, size_t > &counts, int maxc,
     if (i < maxc) {
       topFeatures.push_back(it->second);
       ++i;
+      //cout << it->second << " " << it->first << endl;
     }
-    //cout << it->second << " " << it->first << endl;
   }
   dmlc::Stream * file = dmlc::Stream::Create(featureFile.c_str(), "w");
   file->Write(topFeatures);
